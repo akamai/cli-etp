@@ -31,7 +31,14 @@ Running this will run the system `python setup.py` automatically.
 On Akamai Control Center, make sure you create an API user with the _ETP Configuration API_ (`/etp-config`) with read-write permission.
 
 Upon user credential creation, you'll get a `.edgerc` file with 4 parameters.
-You'll need to add a 5th line with the etp_config_id you can get going into the Enterprise Threat Defender > Utilities
+You'll need to add a 5th line with the `etp_config_id`. 
+
+The value of the parameter is a integer you can obtain by navigating in Akamai Control Center: 
+
+- Select Enterprise Threat Defender from the left menu
+- Select Utilities 
+- Select ETP Client tab 
+- Locate _customer identifier_ on the right
 
 Example of `.edgerc` file:
 ```
@@ -88,3 +95,8 @@ $ akamai etp list add 11603 12.34.56.78
 $ akamai etp list deploy 11603
 ```
 
+## Troubleshooting
+
+### ERROR: Exiting with code 404, reason: Code-130009
+
+Make sure the API user has access to the ETP Config ID defined the .edgerc file, typically a mismatch will cause the 404 error.

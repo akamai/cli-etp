@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+
+# Copyright 2019 Akamai Technologies, Inc. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import print_function
+import requests
+from requests.compat import urljoin
+import sys
+import json
+import json.decoder
+import ipaddress
+from akamai.edgegrid import EdgeGridAuth
+from config import EdgeGridConfig
+
+from enum import Enum
+
+session = requests.Session()
+verbose = False
+section_name = "default"
+
+# If all parameters are set already, use them.  Otherwise
+# use the config
+config = EdgeGridConfig({"verbose": False}, section_name)
+verbose = getattr(config, "verbose", False)
+
+# Set auth
+session.auth = EdgeGridAuth(
+    client_token = config.client_token,
+    client_secret = config.client_secret,
+    access_token = config.access_token
+)
+
+session.headers.update({'User-Agent': "AkamaiCLI"})
+
+baseurl = '%s://%s/' % ('https', config.host)
+
+class ETPListType(Enum):
+    """See https://developer.akamai.com/api/enterprise_security/enterprise_threat_protector_configuration/v1.html"""
+    IP = "LIST_TYPE_IP"
+    DOMAIN = "LIST_TYPE_DOMAIN"
+
+class ETPConfidence(Enum):
+    SUSPECTED = 1
+    KNOWN = 2
+
+def exit_fromresponse(response):
+    """
+    Convert an HTTP Code into an CLI return code.
+    """
+    if response is None:
+        exit(1)
+    if response.status_code == 200:
+        exit(0)
+    else:
+        reason = None
+        try:
+            reason = response.json().get("detail")
+        except ValueError:
+            pass
+        sys.stderr.write("ERROR: Exiting with code %s, reason: %s\n" % (response.status_code, reason))
+        exit(response.status_code)
+
+def type_hostorip(hostorip):
+    try:
+        ipaddress.ip_address(hostorip)
+        return ETPListType.IP
+    except ValueError:
+        return ETPListType.DOMAIN
+
+def main():
+    headers = {'content-type': "application/json;charset=UTF-8"}
+
+    if verbose:
+        print("Command is: %s" % config.command)
+        print("ETP Config ID: %s" % config.etp_config_id)
+        print("CLI action: %s" % config.list_action)
+
+    if config.list_action == "add":
+        confidence = ETPConfidence.KNOWN
+        if config.suspect:
+            confidence = ETPConfidence.SUSPECTED
+        if verbose:
+            print ("add %s to the list %s (confidence: %s)" % (config.iporhost, config.listid, confidence))
+        add_item_url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/%s/items" % 
+            (config.etp_config_id, config.listid))
+        if verbose:
+            print ("Webservice URL: %s" % add_item_url)
+        change = {
+            "add": [],
+            "delete": []
+            }
+        for item in config.iporhost:
+           change["add"].append({
+                "type": type_hostorip(config.iporhost).value,
+                "value": item,
+                "confidenceLevelId": confidence.value
+                }) 
+        if verbose:
+            print("== payload ===")
+            print(json.dumps(change))
+        
+        r = session.patch(add_item_url,  data=json.dumps(change), headers=headers)
+        exit_fromresponse(r)
+
+    elif config.list_action == "deploy":
+        url = urljoin(baseurl, "etp-config/v1/configs/%s/lists/deployments" % config.etp_config_id)
+        payload = {
+            "id": config.listid,
+            "status": "PENDING"
+        }
+        r = session.post(url, data=json.dumps(payload), headers=headers)
+        exit_fromresponse(r)
+
+    elif config.list_action == "get":
+        url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
+        r = session.get(url, headers=headers)
+        if r.status_code == 200:
+            for l in r.json():
+                print("%s,%s" % (l.get("id"), l.get('name')))
+        exit_fromresponse(r)
+
+    else:
+        sys.stderr.write("Action %s not implemented.\n" % config.list_action)
+
+if __name__ == '__main__':
+    main()

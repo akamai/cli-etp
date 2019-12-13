@@ -1,0 +1,5 @@
+/vendor/
+/node_modules/
+__pycache__
+.edgerc
+/venv/
