@@ -2,4 +2,5 @@
 /node_modules/
 __pycache__
 .edgerc
-/venv/
+/venv*/
+*.pyc

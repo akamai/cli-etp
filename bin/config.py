@@ -60,8 +60,10 @@ class EdgeGridConfig():
 
         parser.add_argument('--verbose', '-v', default=False, action='count', help=' Verbose mode')
         parser.add_argument('--debug', '-d', default=False, action='count', help=' Debug mode (prints HTTP headers)')
-        parser.add_argument('--edgerc', '-e', default='~/.edgerc', metavar='credentials_file', help=' Location of the credentials file (default is ~/.edgerc)')
-        parser.add_argument('--section', '-c', default='default', metavar='credentials_file_section', action='store', help=' Credentials file Section\'s name to use')
+        parser.add_argument('--edgerc', '-e', default='~/.edgerc', metavar='credentials_file', 
+                            help=' Location of the credentials file (default is ~/.edgerc)')
+        parser.add_argument('--section', '-c', default='default', metavar='credentials_file_section', action='store', 
+                            help=' Credentials file Section\'s name to use')
 
         if flags:
             for argument in flags.keys():

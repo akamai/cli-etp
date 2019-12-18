@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from __future__ import print_function
+from builtins import str
 import requests
 from requests.compat import urljoin
 import sys
@@ -73,8 +74,13 @@ def exit_fromresponse(response):
         exit(response.status_code)
 
 def type_hostorip(hostorip):
+    """
+    Detect if a string is an actual IP address (IPv4 or IPv6) or an hostname
+    """
+    if type(hostorip) is not str:
+        raise ValueError('hostorip must be a string, %s provided' % type(hostorip))
     try:
-        ipaddress.ip_address(hostorip)
+        ipaddress.ip_address(str(hostorip))
         return ETPListType.IP
     except ValueError:
         return ETPListType.DOMAIN
@@ -103,7 +109,7 @@ def main():
             }
         for item in config.iporhost:
            change["add"].append({
-                "type": type_hostorip(config.iporhost).value,
+                "type": type_hostorip(item).value,
                 "value": item,
                 "confidenceLevelId": confidence.value
                 }) 

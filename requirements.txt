@@ -1,3 +1,4 @@
 requests
 ipaddress
 edgegrid-python
+future
