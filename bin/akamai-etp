@@ -14,11 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# 2to3
+
+from __future__ import print_function
+
+# Standard modules
+
 import sys
 import json
 import json.decoder
 import ipaddress
 from enum import Enum
+
+# 3rd party modules
 
 import requests
 from requests.compat import urljoin
@@ -72,14 +80,22 @@ def exit_fromresponse(response):
         sys.stderr.write("ERROR: Exiting with code %s, reason: %s\n" % (response.status_code, reason))
         exit(response.status_code)
 
+def force_unicode(s):
+    if sys.version_info.major == 2:
+        return unicode(s)
+    else:
+        return s
+
 def type_hostorip(hostorip):
     """
     Detect if a string is an actual IP address (IPv4 or IPv6) or an hostname
     """
-    if not isinstance(hostorip, str):
-        raise ValueError('hostorip must be a string, %s provided' % type(hostorip))
+    if ((sys.version_info.major == 2 and not isinstance(hostorip, unicode)) or
+        (sys.version_info.major > 2 and not isinstance(hostorip, str))):
+        raise ValueError('hostorip must be a unicode string, %s provided' % 
+                         type(hostorip).__name__)
     try:
-        ipaddress.ip_address(str(hostorip))
+        ipaddress.ip_address(hostorip)
         return ETPListType.IP
     except ValueError:
         return ETPListType.DOMAIN
@@ -90,13 +106,13 @@ def iphost_argument_tolist(config):
             filename = item[1:]
             if filename == "-":
                 for line in sys.stdin:
-                    yield line.strip()
+                    yield force_unicode(line.strip())
             else:
                 with open(filename, "r") as f:
                     for line in f:
-                        yield line.strip()
+                        yield force_unicode(line.strip())
         else:
-            yield item
+            yield force_unicode(item)
 
 def list_add_or_delete(config):
     # Maps security command line argument with dict key
@@ -140,6 +156,7 @@ def list_add_or_delete(config):
 def main():
 
     if verbose:
+        print("Python %s" % sys.version)
         print("Command is: %s" % config.command)
         print("ETP Config ID: %s" % config.etp_config_id)
         print("CLI action: %s" % config.list_action)
