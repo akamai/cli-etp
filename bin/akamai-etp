@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-from builtins import str
 import sys
 import json
 import json.decoder
@@ -24,7 +22,6 @@ from enum import Enum
 
 import requests
 from requests.compat import urljoin
-from six import string_types
 from akamai.edgegrid import EdgeGridAuth
 from config import EdgeGridConfig
 
