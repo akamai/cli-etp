@@ -50,7 +50,7 @@ client_token = your-client-token
 etp_config_id = your-ETP-config-ID
 ```
 
-## Updating
+## Updating ETP CLI module
 
 To update to the latest version:
 
@@ -79,15 +79,37 @@ The result is a coma separated lines:
 
 ### Add items to a list
 
-FQDN
+One FQDN
 ```
 $ akamai etp list add 11603 www.badguys.com
 ```
 
-IP address
+One IP address
 ```
 $ akamai etp list add 11603 12.34.56.78
 ```
+
+Mix of multiple items
+```
+$ akamai etp list add 11603 12.34.56.78 www.badguys.com
+```
+
+Load item from a file
+```
+$ akamai etp list add 11603 @list.txt
+```
+
+You can use pipe command
+```
+$ cat list.txt | akamai etp list add 11603 @-
+```
+
+Or type in and hit Ctrl+D when done
+```
+$ akamai etp list add 11603 @-
+```
+
+You can replace 'add' by 'remove' in the example above to remove items from list.
 
 ### Deploy changes
 

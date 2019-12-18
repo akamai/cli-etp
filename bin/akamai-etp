@@ -43,8 +43,8 @@ session.auth = EdgeGridAuth(
     access_token = config.access_token
 )
 
-session.headers.update({'User-Agent': "AkamaiCLI"})
-
+session.headers.update({'User-Agent': "AkamaiCLI/etp"})
+headers = {'content-type': "application/json;charset=UTF-8"}
 baseurl = '%s://%s/' % ('https', config.host)
 
 class ETPListType(Enum):
@@ -85,40 +85,68 @@ def type_hostorip(hostorip):
     except ValueError:
         return ETPListType.DOMAIN
 
+def iphost_argument_tolist(config):
+    for item in config.iporhost:
+        if item[0:1] == "@":
+            filename = item[1:]
+            if filename == "-":
+                for line in sys.stdin:
+                    yield line.strip()
+            else:
+                with open(filename, "r") as f:
+                    for line in f:
+                        yield line.strip()
+        else:
+            yield item
+
+def list_add_or_delete(config):
+    # Maps security command line argument with dict key
+    action_key = "add"
+    if config.list_action == "remove":
+        action_key = "delete"
+    confidence = ETPConfidence.KNOWN
+    if action_key == "add" and config.suspect:
+        confidence = ETPConfidence.SUSPECTED
+
+    if verbose:
+        print ("%s %s to the list %s (confidence: %s)" % 
+                (action_key, config.iporhost, config.listid, confidence))
+
+    add_item_url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/%s/items" % 
+        (config.etp_config_id, config.listid))
+
+    if verbose:
+        print ("Webservice URL: %s" % add_item_url)
+
+    change = {
+        "add": [],
+        "delete": []
+        }
+    for item in iphost_argument_tolist(config):
+        if action_key == "add":
+            change[action_key].append({
+                "type": type_hostorip(item).value,
+                "value": item,
+                "confidenceLevelId": confidence.value
+                }) 
+        else:
+             change[action_key].append(item)
+    if verbose:
+        print("== payload ===")
+        print(json.dumps(change))
+    
+    r = session.patch(add_item_url,  data=json.dumps(change), headers=headers)
+    exit_fromresponse(r)
+
 def main():
-    headers = {'content-type': "application/json;charset=UTF-8"}
 
     if verbose:
         print("Command is: %s" % config.command)
         print("ETP Config ID: %s" % config.etp_config_id)
         print("CLI action: %s" % config.list_action)
 
-    if config.list_action == "add":
-        confidence = ETPConfidence.KNOWN
-        if config.suspect:
-            confidence = ETPConfidence.SUSPECTED
-        if verbose:
-            print ("add %s to the list %s (confidence: %s)" % (config.iporhost, config.listid, confidence))
-        add_item_url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/%s/items" % 
-            (config.etp_config_id, config.listid))
-        if verbose:
-            print ("Webservice URL: %s" % add_item_url)
-        change = {
-            "add": [],
-            "delete": []
-            }
-        for item in config.iporhost:
-           change["add"].append({
-                "type": type_hostorip(item).value,
-                "value": item,
-                "confidenceLevelId": confidence.value
-                }) 
-        if verbose:
-            print("== payload ===")
-            print(json.dumps(change))
-        
-        r = session.patch(add_item_url,  data=json.dumps(change), headers=headers)
-        exit_fromresponse(r)
+    if config.list_action in ("add", "remove"):
+        list_add_or_delete(config)
 
     elif config.list_action == "deploy":
         url = urljoin(baseurl, "etp-config/v1/configs/%s/lists/deployments" % config.etp_config_id)
