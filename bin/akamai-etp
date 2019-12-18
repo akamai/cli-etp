@@ -16,16 +16,18 @@
 
 from __future__ import print_function
 from builtins import str
-import requests
-from requests.compat import urljoin
 import sys
 import json
 import json.decoder
 import ipaddress
+from enum import Enum
+
+import requests
+from requests.compat import urljoin
+from six import string_types
 from akamai.edgegrid import EdgeGridAuth
 from config import EdgeGridConfig
 
-from enum import Enum
 
 session = requests.Session()
 verbose = False
@@ -77,7 +79,7 @@ def type_hostorip(hostorip):
     """
     Detect if a string is an actual IP address (IPv4 or IPv6) or an hostname
     """
-    if type(hostorip) is not str:
+    if not isinstance(hostorip, str):
         raise ValueError('hostorip must be a string, %s provided' % type(hostorip))
     try:
         ipaddress.ip_address(str(hostorip))

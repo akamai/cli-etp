@@ -1,11 +1,11 @@
 {
   "requirements": {
-    "python": "2.7.6"
+    "python": "3.5"
   },
   "commands": [
     {
       "name": "etp",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "description": "Akamai CLI for ETP common operations, written in Python"
     }
   ]
