@@ -24,6 +24,7 @@ import sys
 import json
 import json.decoder
 import ipaddress
+import time
 from enum import Enum
 
 # 3rd party modules
@@ -114,6 +115,33 @@ def iphost_argument_tolist(config):
         else:
             yield force_unicode(item)
 
+
+def fetch_events(config):
+    """
+    Fetch all events
+    """
+    start = int(time.time()) - (2 * 60 * 60) # 2 hours ago
+    if config.start:
+        start = config.start
+    end = start + 15 * 60 # 15 min span
+    if config.end:
+        end = config.end
+
+    event_url = ('%(baseurl)s/etp-report/v1/configs/%(config_id)s/%(event_type)s-events/details'
+                 '?startTimeSec=%(start)s&endTimeSec=%(end)s') % {
+                 'baseurl': baseurl,
+                 'config_id': config.etp_config_id,
+                 'event_type': config.event_type,
+                 'start': start,
+                 'end': end
+                }
+    if verbose:
+        sys.stderr.write("API URL: %s\n" % event_url)
+    r = session.get(event_url, headers=headers)
+    for e in r.json():
+        print(json.dumps(e))
+
+
 def list_add_or_delete(config):
     # Maps security command line argument with dict key
     action_key = "add"
@@ -153,36 +181,36 @@ def list_add_or_delete(config):
     r = session.patch(add_item_url,  data=json.dumps(change), headers=headers)
     exit_fromresponse(r)
 
+
 def main():
 
     if verbose:
         print("Python %s" % sys.version)
         print("Command is: %s" % config.command)
         print("ETP Config ID: %s" % config.etp_config_id)
-        print("CLI action: %s" % config.list_action)
 
-    if config.list_action in ("add", "remove"):
-        list_add_or_delete(config)
-
-    elif config.list_action == "deploy":
-        url = urljoin(baseurl, "etp-config/v1/configs/%s/lists/deployments" % config.etp_config_id)
-        payload = {
-            "id": config.listid,
-            "status": "PENDING"
-        }
-        r = session.post(url, data=json.dumps(payload), headers=headers)
-        exit_fromresponse(r)
-
-    elif config.list_action == "get":
-        url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
-        r = session.get(url, headers=headers)
-        if r.status_code == 200:
-            for l in r.json():
-                print("%s,%s" % (l.get("id"), l.get('name')))
-        exit_fromresponse(r)
-
-    else:
-        sys.stderr.write("Action %s not implemented.\n" % config.list_action)
+    if config.command == "event":
+        fetch_events(config)
+    elif config.command == "list":
+        if config.list_action in ("add", "remove"):
+            list_add_or_delete(config)
+        elif config.list_action == "deploy":
+            url = urljoin(baseurl, "etp-config/v1/configs/%s/lists/deployments" % config.etp_config_id)
+            payload = {
+                "id": config.listid,
+                "status": "PENDING"
+            }
+            r = session.post(url, data=json.dumps(payload), headers=headers)
+            exit_fromresponse(r)
+        elif config.list_action == "get":
+            url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
+            r = session.get(url, headers=headers)
+            if r.status_code == 200:
+                for l in r.json():
+                    print("%s,%s" % (l.get("id"), l.get('name')))
+            exit_fromresponse(r)
+        else:
+            sys.stderr.write("Action %s not implemented.\n" % config.list_action)
 
 if __name__ == '__main__':
     main()

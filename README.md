@@ -58,7 +58,28 @@ To update to the latest version:
 $ akamai update etp
 ```
 
-## Example
+## Examples
+
+### Fetch events
+
+Fetch the latest security events with the `event` command.
+By default we fetch from 2 hours ago to 1h45 minutes ago, you can customize using start and end parameter and pass EPOCH timestamp.
+
+```
+$ akamai etp event threat
+```
+
+or Accceptable Use Policy
+
+```
+$ akamai etp event aup
+```
+
+You can pipe it to a file or your favorite JSON parser like _jq_ or _ConvertFrom-Json_ in Powershell.
+
+```
+$ akamai etp event aup --start 1576877365 --end 1576878265|jq .
+```
 
 Get the lists available on the account
 ```

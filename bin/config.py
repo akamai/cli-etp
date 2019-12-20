@@ -38,12 +38,19 @@ class EdgeGridConfig():
     def __init__(self, config_values, configuration, flags=None):
         parser = self.parser
 
-        subparsers = parser.add_subparsers(dest="command" ,help='commands')
+        subparsers = parser.add_subparsers(dest="command", help='ETP object to manipulate')
+
+        event_parser = subparsers.add_parser("event", help="Fetch last events (from 2 hours ago to 1 hour ago)")
+        event_parser.add_argument('event_type', nargs='?', default="threat", 
+                                  choices=['threat', 'aup'], help="Event type")
+        event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH), default is 2 hours ago")
+        event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH), default is start + 15 minutes")
+    
 
         list_parser = subparsers.add_parser("list", help="Manage ETP security list")
         subsub = list_parser.add_subparsers(dest="list_action", help='List action')
 
-        subsub.add_parser("get", help="List of list")
+        subsub.add_parser("get", help="List of ETP security lists")
 
         listadd = subsub.add_parser("add", help="Add one or multiple IP or host to a list")
         listadd.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
