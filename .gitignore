@@ -5,3 +5,4 @@ __pycache__
 /venv*/
 *.pyc
 /test/
+.DS_Store
