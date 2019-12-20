@@ -81,6 +81,8 @@ You can pipe it to a file or your favorite JSON parser like _jq_ or _ConvertFrom
 $ akamai etp event aup --start 1576877365 --end 1576878265|jq .
 ```
 
+### Manage security lists
+
 Get the lists available on the account
 ```
 $ akamai etp list get
@@ -98,7 +100,7 @@ The result is a coma separated lines:
 13641,Serial sequence testing
 ```
 
-### Add items to a list
+#### Add items to a list
 
 One FQDN
 ```
@@ -132,7 +134,7 @@ $ akamai etp list add 11603 @-
 
 You can replace 'add' by 'remove' in the example above to remove items from list.
 
-### Deploy changes
+#### Deploy list changes
 
 ```
 $ akamai etp list deploy 11603
