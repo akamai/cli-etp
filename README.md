@@ -35,7 +35,7 @@ You'll need to add a 5th line with the `etp_config_id`.
 
 The value of the parameter is a integer you can obtain by navigating in Akamai Control Center: 
 
-- Select Enterprise Threat Defender from the left menu
+- Select Enterprise Threat Protector from the left menu
 - Select Utilities 
 - Select ETP Client tab 
 - Locate _customer identifier_ on the right
