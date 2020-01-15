@@ -1,19 +1,34 @@
-# Akamai CLI: Enterprise Threat Protector
+# Akamai CLI: Enterprise Threat Protector<!-- omit in toc -->
 
-## Scope
+## Table of contents<!-- omit in toc -->
+
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+  - [Akamai CLI](#akamai-cli)
+- [Install](#install)
+  - [API User and configuration file](#api-user-and-configuration-file)
+- [Updating ETP CLI module](#updating-etp-cli-module)
+- [Examples](#examples)
+  - [Fetch events](#fetch-events)
+  - [Manage security lists](#manage-security-lists)
+    - [Add items to a list](#add-items-to-a-list)
+    - [Deploy list changes](#deploy-list-changes)
+- [Troubleshooting](#troubleshooting)
+  - [ERROR: Exiting with code 404, reason: Code-130009](#error-exiting-with-code-404-reason-code-130009)
+
+## Introduction
 
 Enterprise Threat Protector (ETP) comes with a full suite of APIs. 
 Yet you need to build scripts to be able to interact with the service.
 
 That's where Akamai CLI toolkit greatly help, no longer script to wrote yourself, you can run very common operations directly from the command line.
 
-The kit also takes care of all the dependencies like Python version or modules.
-
 ## Prerequisites
 
 ### Akamai CLI
 
 You'll need the CLI toolkit, available on many platform.
+
 Please visit the [Getting Started](https://developer.akamai.com/cli/docs/getting-started) guide on developer.akamai.com.
 
 ## Install
@@ -28,7 +43,8 @@ Running this will run the system `python setup.py` automatically.
 
 ### API User and configuration file
 
-On Akamai Control Center, make sure you create an API user with the _ETP Configuration API_ (`/etp-config`) with read-write permission.
+On [Akamai Control Center](https://control.akamai.com), make sure you create an API user 
+with the _ETP Configuration API_ (`/etp-config`) with read-write permission.
 
 Upon user credential creation, you'll get a `.edgerc` file with 4 parameters.
 You'll need to add a 5th line with the `etp_config_id`. 
@@ -63,7 +79,14 @@ $ akamai update etp
 ### Fetch events
 
 Fetch the latest security events with the `event` command.
-By default we fetch from 2 hours ago to 1h45 minutes ago, you can customize using start and end parameter and pass EPOCH timestamp.
+
+![start and end definition](docs/receiving-data.png "start and end definition")
+
+
+If `--start` is not specified, we set it to 1 hour and 15 minutes ago  
+If `--end` is not specified, we set it to 1 hour ago
+
+Both argument expect a EPOCH timestamp.
 
 ```
 $ akamai etp event threat
@@ -144,4 +167,4 @@ $ akamai etp list deploy 11603
 
 ### ERROR: Exiting with code 404, reason: Code-130009
 
-Make sure the API user has access to the ETP Config ID defined the .edgerc file, typically a mismatch will cause the 404 error.
+Make sure the API user has access to the ETP Config ID defined the `.edgerc` file, typically a mismatch will cause the 404 error.
