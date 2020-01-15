@@ -1,4 +1,4 @@
-# Python edgegrid module - CONFIG for ImgMan CLI module
+# Python edgegrid module - CONFIG for ETP CLI module
 """ 
  Copyright 2019 Akamai Technologies, Inc. All Rights Reserved.
  Licensed under the Apache License, Version 2.0 (the "License");
