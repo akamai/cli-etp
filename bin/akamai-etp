@@ -37,7 +37,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth
 from config import EdgeGridConfig
 
-__version__ = "0.2.1"
+__version__ = "0.2.5"
 
 #: Data collection delay, default is 60 minutes
 collection_delay_min = 60
