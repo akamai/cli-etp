@@ -16,7 +16,7 @@ else
 fi
 
 etp_config_id=$(grep etp_config_id ~/.edgerc|awk '{print $3}')
-if [$etp_config_id == ""]; then
+if [[ "$etp_config_id" == "" ]]; then
     echo "ERROR: cannot extract etp_config_id in ~/.edgerc"
     exit 2
 fi

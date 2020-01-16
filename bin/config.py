@@ -29,44 +29,62 @@ else:
     from ConfigParser import ConfigParser
     import httplib as http_client
 
+
+epilog = '''Copyright (C) Akamai Technologies, Inc\n''' \
+         '''Visit http://github.com/akamai/cli-etp for detailed documentation'''
 logger = logging.getLogger(__name__)
 
 class EdgeGridConfig():
 
-    parser = argparse.ArgumentParser(description='Process command line options.')
+    parser = argparse.ArgumentParser(description='Interact with ETP configuration and logs/events', epilog=epilog,
+                                     formatter_class=argparse.RawTextHelpFormatter)
 
     def __init__(self, config_values, configuration, flags=None):
         parser = self.parser
-
         subparsers = parser.add_subparsers(dest="command", help='ETP object to manipulate')
 
-        event_parser = subparsers.add_parser("event", help="Fetch last events (from 2 hours ago to 1 hour ago)")
+        event_parser = subparsers.add_parser("event", help="Fetch last events (from 1h15 ago to 1 hour ago)",
+                                             epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         event_parser.add_argument('event_type', nargs='?', default="threat", 
-                                  choices=['threat', 'aup'], help="Event type")
-        event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH), default is 2 hours ago")
-        event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH), default is start + 15 minutes")
-    
+                                  choices=['threat', 'aup'], help="Event type, threat or Acceptable User Policy (AUP)")
+        event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 1h15 ago")
+        event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is start + 15 minutes")
+        event_parser.add_argument('--output', '-o', help="Output file, default is stdout. Encoding is utf-8.")
+        event_parser.add_argument('--tail', '-f', action='store_true', default=False, 
+                                  help="""Do not stop when most recent log is reached,\n"""
+                                       """rather to wait for additional data to be appended\n"""
+                                       """to the input. --start and --end are ignored when used.""")
 
-        list_parser = subparsers.add_parser("list", help="Manage ETP security list")
+
+        list_parser = subparsers.add_parser("list", help="Manage ETP security list",
+                                            epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         subsub = list_parser.add_subparsers(dest="list_action", help='List action')
 
         subsub.add_parser("get", help="List of ETP security lists")
 
-        listadd = subsub.add_parser("add", help="Add one or multiple IP or host to a list")
+        listadd = subsub.add_parser("add", help="Add one or multiple IP or host to a list",
+                                    epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listadd.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
         listadd.add_argument('iporhost', metavar='IP/host', nargs='+', help='IP or FQDN to add/remove to the list')
         listadd.add_argument('--suspect', dest='suspect', default=False, action="store_true", 
             help='Item will be added as suspect confidence instead of known')
 
-        listremove = subsub.add_parser("remove", help="Remove one or multiple IP or host from a list")
+        listremove = subsub.add_parser("remove", help="Remove one or multiple IP or host from a list", 
+                                       epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listremove.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
         listremove.add_argument('iporhost', metavar='IP/host', nargs='+', help='IP or FQDN to add/remove to the list')
 
-        listdeploy =  subsub.add_parser("deploy", help="Deploy changes made to a list")
+        listdeploy =  subsub.add_parser("deploy", help="Deploy changes made to a list",
+                                        epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listdeploy.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
+
+        subparsers.add_parser("version", help="Display CLI ETP module version", 
+                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
 
         parser.add_argument('--verbose', '-v', default=False, action='count', help=' Verbose mode')
         parser.add_argument('--debug', '-d', default=False, action='count', help=' Debug mode (prints HTTP headers)')
+        parser.add_argument('--logfile', '-l', default=None, help='Log file, stdout if not set')
+
         parser.add_argument('--edgerc', '-e', default='~/.edgerc', metavar='credentials_file', 
                             help=' Location of the credentials file (default is ~/.edgerc)')
         parser.add_argument('--section', '-c', default='default', metavar='credentials_file_section', action='store', 

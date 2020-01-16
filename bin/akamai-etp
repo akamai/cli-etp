@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2019 Akamai Technologies, Inc. All Rights Reserved
+# Copyright 2020 Akamai Technologies, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,12 +20,15 @@ from __future__ import print_function
 
 # Standard modules
 
-import sys
+import sys, os
 import json
 import json.decoder
 import ipaddress
 import time
+import signal
+from threading import Event
 from enum import Enum
+import logging
 
 # 3rd party modules
 
@@ -34,10 +37,20 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth
 from config import EdgeGridConfig
 
+__version__ = "0.2.1"
+
+#: Data collection delay, default is 60 minutes
+collection_delay_min = 60
+#: Window span in ad-hoc mode, default is 15 min
+span_duration_min = 15
+#: How often we poll in --tail mode, default is 60 sec
+poll_interval_sec = 60
 
 session = requests.Session()
 verbose = False
 section_name = "default"
+
+LOG = logging.getLogger(__name__)
 
 # If all parameters are set already, use them.  Otherwise
 # use the config
@@ -51,9 +64,9 @@ session.auth = EdgeGridAuth(
     access_token = config.access_token
 )
 
-session.headers.update({'User-Agent': "AkamaiCLI/etp"})
+session.headers.update({'User-Agent': "Akamai-CLI etp/%s" % __version__})
 headers = {'content-type': "application/json;charset=UTF-8"}
-baseurl = '%s://%s/' % ('https', config.host)
+baseurl = '%s://%s' % ('https', config.host)
 
 class ETPListType(Enum):
     """See https://developer.akamai.com/api/enterprise_security/enterprise_threat_protector_configuration/v1.html"""
@@ -116,31 +129,63 @@ def iphost_argument_tolist(config):
             yield force_unicode(item)
 
 
-def fetch_events(config):
+def fetch_events(config, output):
     """
     Fetch all events
     """
-    start = int(time.time()) - (2 * 60 * 60) # 2 hours ago
-    if config.start:
-        start = config.start
-    end = start + 15 * 60 # 15 min span
-    if config.end:
-        end = config.end
+    stop_event = Event()
+    event_count = 0
 
-    event_url = ('%(baseurl)s/etp-report/v1/configs/%(config_id)s/%(event_type)s-events/details'
-                 '?startTimeSec=%(start)s&endTimeSec=%(end)s') % {
-                 'baseurl': baseurl,
-                 'config_id': config.etp_config_id,
-                 'event_type': config.event_type,
-                 'start': start,
-                 'end': end
-                }
-    if verbose:
-        sys.stderr.write("API URL: %s\n" % event_url)
-    r = session.get(event_url, headers=headers)
-    for e in r.json():
-        print(json.dumps(e))
+    def exit_gracefully(signum, frame):
+        stop_event.set()
 
+    if config.tail: # The window span is show so we can keep adding content by small increment
+        start = int(time.time()) - (collection_delay_min * 60) - poll_interval_sec
+        end = start + poll_interval_sec
+        signal.signal(signal.SIGTERM, exit_gracefully)
+        signal.signal(signal.SIGINT, exit_gracefully)
+    else: # Larger window span
+        start = int(time.time()) - (collection_delay_min * 60) - (span_duration_min * 60)
+        if config.start:
+            start = config.start
+        end = start + (span_duration_min * 60)
+        if config.end:
+            end = config.end
+    try:
+        while not stop_event.is_set():
+            timing_s = time.time() # The fetch operation can take a while
+            event_url = ('%(baseurl)s/etp-report/v1/configs/%(config_id)s/%(event_type)s-events/details'
+                        '?startTimeSec=%(start)s&endTimeSec=%(end)s') % {
+                        'baseurl': baseurl,
+                        'config_id': config.etp_config_id,
+                        'event_type': config.event_type,
+                        'start': start,
+                        'end': end
+                        }
+            LOG.info("{OPEN} API URL: %s" % event_url)
+            r = session.get(event_url, headers=headers)
+            LOG.info("{OPEN} API call took %.2f seconds" % (time.time() - timing_s))
+            for e in r.json():
+                output.write("%s\n" % json.dumps(e))
+                event_count += 1
+            output.flush()
+            if not config.tail:
+                break
+            else:
+                LOG.info("%d event(s) fetched so far" % event_count)
+                # Here we assume the fetch should take less than poll_interval_sec
+                # otherwise we may have datagaps
+                # TODO: add a better/more resilient logic
+                sleep_time = max(0, poll_interval_sec - (time.time() - timing_s))
+                if sleep_time == 0:
+                    LOG.WARN("Potential data gaps")
+                LOG.info("Sleeping for %.2f sec..." % sleep_time)
+                stop_event.wait(sleep_time)
+                start = int(time.time()) - (collection_delay_min * 60) - poll_interval_sec
+                end = start + poll_interval_sec
+                LOG.info("Next cycle will be from %s to %s..." % (start, end))
+    finally:
+        LOG.info("%d event(s) fetched in total" % event_count)
 
 def list_add_or_delete(config):
     # Maps security command line argument with dict key
@@ -151,15 +196,13 @@ def list_add_or_delete(config):
     if action_key == "add" and config.suspect:
         confidence = ETPConfidence.SUSPECTED
 
-    if verbose:
-        print ("%s %s to the list %s (confidence: %s)" % 
-                (action_key, config.iporhost, config.listid, confidence))
+    LOG.info("%s %s to the list %s (confidence: %s)" % 
+             (action_key, config.iporhost, config.listid, confidence))
 
     add_item_url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/%s/items" % 
         (config.etp_config_id, config.listid))
 
-    if verbose:
-        print ("Webservice URL: %s" % add_item_url)
+    LOG.info("Webservice URL: %s" % add_item_url)
 
     change = {
         "add": [],
@@ -182,20 +225,44 @@ def list_add_or_delete(config):
     exit_fromresponse(r)
 
 
+def log_level():
+    if config.debug:
+        return logging.DEBUG
+    elif config.verbose:
+        return logging.INFO
+    else:
+        return logging.ERROR
+
+
 def main():
 
-    if verbose:
-        print("Python %s" % sys.version)
-        print("Command is: %s" % config.command)
-        print("ETP Config ID: %s" % config.etp_config_id)
+    logging.basicConfig(filename=config.logfile, level=log_level(),
+        format='%(asctime)s [%(levelname)s] %(threadName)s %(message)s')
+
+    LOG.info("Python %s" % sys.version)
+    LOG.info("PID: %s" % os.getpid())
+    LOG.info("Command is: %s" % config.command)
+    LOG.info("ETP Config ID: %s" % config.etp_config_id)
 
     if config.command == "event":
-        fetch_events(config)
+        if config.output is None:
+            out = sys.stdout
+        else:
+            LOG.info("Output file: %s" % config.output)
+            out = open(config.output, 'w+')
+        try:
+            fetch_events(config, out)
+        finally:
+            if out is not None and out != sys.stdout:
+                LOG.info("Closing output file %s..." % config.output)
+                out.close()
+
+
     elif config.command == "list":
         if config.list_action in ("add", "remove"):
             list_add_or_delete(config)
         elif config.list_action == "deploy":
-            url = urljoin(baseurl, "etp-config/v1/configs/%s/lists/deployments" % config.etp_config_id)
+            url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/deployments" % config.etp_config_id)
             payload = {
                 "id": config.listid,
                 "status": "PENDING"
@@ -211,6 +278,9 @@ def main():
             exit_fromresponse(r)
         else:
             sys.stderr.write("Action %s not implemented.\n" % config.list_action)
+    elif config.command == "version":
+        print(__version__)
+
 
 if __name__ == '__main__':
     main()
