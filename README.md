@@ -82,8 +82,8 @@ Fetch the latest security events with the `event` command.
 
 ![start and end definition](docs/receiving-data.png "start and end definition")
 
-If `--start` is not specified, we set it to 1 hour and 15 minutes ago  
-If `--end` is not specified, we set it to 1 hour ago
+If `--start` is not specified, we set it to 45 minutes ago  
+If `--end` is not specified, we set it to 30 minutes ago
 
 Both argument expect a EPOCH timestamp.
 

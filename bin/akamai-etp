@@ -39,8 +39,8 @@ from config import EdgeGridConfig
 
 __version__ = "0.2.5"
 
-#: Data collection delay, default is 60 minutes
-collection_delay_min = 60
+#: Data collection delay, default is 30 minutes
+collection_delay_min = 30
 #: Window span in ad-hoc mode, default is 15 min
 span_duration_min = 15
 #: How often we poll in --tail mode, default is 60 sec
