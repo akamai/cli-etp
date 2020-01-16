@@ -82,7 +82,6 @@ Fetch the latest security events with the `event` command.
 
 ![start and end definition](docs/receiving-data.png "start and end definition")
 
-
 If `--start` is not specified, we set it to 1 hour and 15 minutes ago  
 If `--end` is not specified, we set it to 1 hour ago
 
@@ -98,7 +97,23 @@ or Accceptable Use Policy
 $ akamai etp event aup
 ```
 
-You can pipe it to a file or your favorite JSON parser like _jq_ or _ConvertFrom-Json_ in Powershell.
+You may want to use the blocking mode using `--tail`
+
+```
+$ akamai etp event aup --tail
+```
+
+You can also send the output to a specific file (appending mode) with `--output`:
+
+```
+$ akamai etp event aup --tail --output /tmp/etp_event_aup.json
+```
+
+When using the block mode, you can gracefully stop the command process:
+- either manually with Control+C (Control-Break)
+- or sending a SIG_TERM signal
+
+You can also pipe the command to another process like your favorite JSON parser like _jq_ or _ConvertFrom-Json_ in Powershell.
 
 ```
 $ akamai etp event aup --start 1576877365 --end 1576878265|jq .
