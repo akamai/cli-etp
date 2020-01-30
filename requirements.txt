@@ -2,3 +2,4 @@ requests
 ipaddress
 edgegrid-python
 future
+enum34
