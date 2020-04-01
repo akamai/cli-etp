@@ -3,3 +3,4 @@ ipaddress
 edgegrid-python
 future
 enum34
+pyOpenSSL
