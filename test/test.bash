@@ -11,7 +11,7 @@ else
     if type -t deactivate > /dev/null; then
         deactivate
     fi
-    . $dir/venv.27/bin/activate
+    . $dir/venv/bin/activate
     interpreter="$dir/bin/akamai-etp -v"
 fi
 
@@ -38,10 +38,10 @@ $interpreter version
 $interpreter event aup
 $interpreter event threat
 
-exit
 
 # List management
-
+$interpreter list get
+random_listid=$($interpreter list get|sort -R| head -n 1|cut -f1 -d,)
 $interpreter list add $etp_config_id $random_ip
 $interpreter list add $etp_config_id $random_ip2 $random_ip3
 $interpreter list add $etp_config_id $random_host

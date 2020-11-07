@@ -36,7 +36,9 @@ logger = logging.getLogger(__name__)
 
 class EdgeGridConfig():
 
-    parser = argparse.ArgumentParser(description='Interact with ETP configuration and logs/events', epilog=epilog,
+    parser = argparse.ArgumentParser(prog="akamai etp",
+                                     description='Interact with ETP configuration and logs/events', 
+                                     epilog=epilog,
                                      formatter_class=argparse.RawTextHelpFormatter)
 
     def __init__(self, config_values, configuration, flags=None):
@@ -60,7 +62,8 @@ class EdgeGridConfig():
                                             epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         subsub = list_parser.add_subparsers(dest="list_action", help='List action')
 
-        subsub.add_parser("get", help="List of ETP security lists")
+        listget = subsub.add_parser("get", help="List of ETP security lists")
+        listget.add_argument('listid', type=int, nargs='?', metavar='listid', help='ETP list ID')
 
         listadd = subsub.add_parser("add", help="Add one or multiple IP or host to a list",
                                     epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
@@ -77,6 +80,16 @@ class EdgeGridConfig():
         listdeploy =  subsub.add_parser("deploy", help="Deploy changes made to a list",
                                         epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listdeploy.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
+
+        ioc_parser = subparsers.add_parser("ioc", help="Manage Indicator of Compromise (IOC) feed intelligence",
+                                           epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+        iocsubsub = ioc_parser.add_subparsers(dest="ioc_action", help='List action')
+        ioc_info = iocsubsub.add_parser("info", help="Information on a particular internet domain")
+        ioc_info.add_argument('domain', type=str, metavar='domain', help='Internet domain (eg. example.com)')
+        ioc_timeseries = iocsubsub.add_parser("timeseries", help="Time Series intelligence")
+        ioc_timeseries.add_argument('domain', type=str, metavar='domain', help='Internet domain (eg. example.com)')
+        ioc_changes = iocsubsub.add_parser("changes", help="Information on a particular internet domain")
+        ioc_changes.add_argument('domain', type=str, metavar='domain', help='Internet domain (eg. example.com)')
 
         subparsers.add_parser("version", help="Display CLI ETP module version", 
                               epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)

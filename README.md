@@ -13,6 +13,7 @@
   - [Manage security lists](#manage-security-lists)
     - [Add items to a list](#add-items-to-a-list)
     - [Deploy list changes](#deploy-list-changes)
+  - [Query Akamai IOC inteligence database](#query-akamai-ioc-inteligence-database)
 - [Troubleshooting](#troubleshooting)
   - [ERROR: Exiting with code 404, reason: Code-130009](#error-exiting-with-code-404-reason-code-130009)
 
@@ -129,13 +130,14 @@ $ akamai etp list get
 The result is a coma separated lines:
 
 ```
-7721,Custom Blacklist
-11981,LOLCats Blacklist
-11603,Zero Trust Demo Blacklist
-11821,Zero Trust Demo Whitelist
+7721,Custom Deny list
+11981,LOLCats Deny list
+11603,Zero Trust Demo Deny list
 14461,Social Media
-14821,White List Domains
-13641,Serial sequence testing
+14821,Allow List Domains
+22206,Custom fileshare site
+24204,ZTX Exception list
+15704,Allow List
 ```
 
 #### Add items to a list
@@ -176,6 +178,14 @@ You can replace 'add' by 'remove' in the example above to remove items from list
 
 ```
 $ akamai etp list deploy 11603
+```
+
+### Query Akamai IOC inteligence database
+
+```
+$ akamai etp ioc info akamaietpmalwaretest.com
+$ akamai etp ioc changes akamaietpmalwaretest.com
+$ akamai etp ioc timeseries akamaietpmalwaretest.com
 ```
 
 ## Troubleshooting

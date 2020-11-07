@@ -14,13 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# 2to3
-
-from __future__ import print_function
-
 # Standard modules
 
-import sys, os
+import sys
+import os
 import json
 import json.decoder
 import ipaddress
@@ -37,7 +34,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth
 from config import EdgeGridConfig
 
-__version__ = "0.2.5"
+__version__ = "0.3.0"
 
 #: Data collection delay, default is 30 minutes
 collection_delay_min = 30
@@ -59,9 +56,9 @@ verbose = getattr(config, "verbose", False)
 
 # Set auth
 session.auth = EdgeGridAuth(
-    client_token = config.client_token,
-    client_secret = config.client_secret,
-    access_token = config.access_token
+    client_token=config.client_token,
+    client_secret=config.client_secret,
+    access_token=config.access_token
 )
 
 session.headers.update({'User-Agent': "Akamai-CLI etp/%s" % __version__})
@@ -225,6 +222,52 @@ def list_add_or_delete(config):
     exit_fromresponse(r)
 
 
+class ioc:
+
+    recordType = 'DOMAIN'
+
+    @staticmethod
+    def isrisky(domain):
+        params = {'record': domain, 'recordType': ioc.recordType}
+        path = '/etp-report/v1/ioc/domain-tree'
+        resp = session.get(urljoin(baseurl, path), params=params)
+        LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
+        domaintree = resp.json()
+        return len(domaintree) > 0
+
+    @staticmethod
+    def info(domain):
+        """IOC information about the domain."""
+        params = {'record': domain, 'recordType': ioc.recordType}
+        path = '/etp-report/v1/ioc/information'
+        resp = session.get(urljoin(baseurl, path), params=params)
+        LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
+        print(resp.text)
+
+    @staticmethod
+    def timeseries(domain):
+        """IOC time series about the domain."""
+        params = {'record': domain, 'recordType': ioc.recordType}
+        path = "/etp-report/v1/configs/100/ioc/time-series"
+        resp = session.get(urljoin(baseurl, path), params=params)
+        LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
+        data = resp.json()
+        if len(data.get('rows', [])) > 0:
+            print(resp.text)
+        else:
+            sys.stderr.write("Domain not seen before.\n")
+            sys.exit(3)
+
+    @staticmethod
+    def changes(domain):
+        """IOC observed changes on a domain."""
+        params = {'record': domain, 'recordType': ioc.recordType}
+        path = '/etp-report/v1/ioc/changes'
+        resp = session.get(urljoin(baseurl, path), params=params)
+        LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
+        print(resp.text)
+
+
 def log_level():
     if config.debug:
         return logging.DEBUG
@@ -257,7 +300,6 @@ def main():
                 LOG.info("Closing output file %s..." % config.output)
                 out.close()
 
-
     elif config.command == "list":
         if config.list_action in ("add", "remove"):
             list_add_or_delete(config)
@@ -270,14 +312,35 @@ def main():
             r = session.post(url, data=json.dumps(payload), headers=headers)
             exit_fromresponse(r)
         elif config.list_action == "get":
-            url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
-            r = session.get(url, headers=headers)
-            if r.status_code == 200:
-                for l in r.json():
-                    print("%s,%s" % (l.get("id"), l.get('name')))
-            exit_fromresponse(r)
+            if config.listid:
+                url = urljoin(baseurl, "/etp-config/v1/configs/{configId}/lists/{listId}/items".format(
+                    configId=config.etp_config_id,
+                    listId=config.listid
+                ))
+                r = session.get(url, headers=headers)
+                if r.status_code == 200:
+                    for dom in r.json().get("items", []):
+                        print(dom.get('value'))
+                exit_fromresponse(r)
+            else:
+                url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
+                r = session.get(url, headers=headers)
+                if r.status_code == 200:
+                    for l in r.json():
+                        print("%s,%s" % (l.get("id"), l.get('name')))
+                exit_fromresponse(r)
         else:
             sys.stderr.write("Action %s not implemented.\n" % config.list_action)
+    elif config.command == "ioc":
+        if not config.domain or not ioc.isrisky(config.domain):
+            sys.exit(2)
+        if config.ioc_action == "info":
+            ioc.info(config.domain)
+        if config.ioc_action == "timeseries":
+            ioc.timeseries(config.domain)
+        elif config.ioc_action == "changes":
+            ioc.changes(config.domain)
+        
     elif config.command == "version":
         print(__version__)
 
