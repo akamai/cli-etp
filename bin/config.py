@@ -1,18 +1,18 @@
 # Python edgegrid module - CONFIG for ETP CLI module
-""" 
- Copyright 2019 Akamai Technologies, Inc. All Rights Reserved.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
+"""
+Copyright 2021 Akamai Technologies, Inc. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
 
- You may obtain a copy of the License at
+You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 """
 
 import sys
@@ -33,6 +33,7 @@ else:
 epilog = '''Copyright (C) Akamai Technologies, Inc\n''' \
          '''Visit http://github.com/akamai/cli-etp for detailed documentation'''
 logger = logging.getLogger(__name__)
+
 
 class EdgeGridConfig():
 
@@ -57,7 +58,6 @@ class EdgeGridConfig():
                                        """rather to wait for additional data to be appended\n"""
                                        """to the input. --start and --end are ignored when used.""")
 
-
         list_parser = subparsers.add_parser("list", help="Manage ETP security list",
                                             epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         subsub = list_parser.add_subparsers(dest="list_action", help='List action')
@@ -70,15 +70,15 @@ class EdgeGridConfig():
         listadd.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
         listadd.add_argument('iporhost', metavar='IP/host', nargs='+', help='IP or FQDN to add/remove to the list')
         listadd.add_argument('--suspect', dest='suspect', default=False, action="store_true", 
-            help='Item will be added as suspect confidence instead of known')
+                             help='Item will be added as suspect confidence instead of known')
 
         listremove = subsub.add_parser("remove", help="Remove one or multiple IP or host from a list", 
                                        epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listremove.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
         listremove.add_argument('iporhost', metavar='IP/host', nargs='+', help='IP or FQDN to add/remove to the list')
 
-        listdeploy =  subsub.add_parser("deploy", help="Deploy changes made to a list",
-                                        epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+        listdeploy = subsub.add_parser("deploy", help="Deploy changes made to a list",
+                                       epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listdeploy.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
 
         ioc_parser = subparsers.add_parser("ioc", help="Manage Indicator of Compromise (IOC) feed intelligence",
@@ -117,7 +117,7 @@ class EdgeGridConfig():
 
         try:
             args = parser.parse_args()
-        except:
+        except Exception:
             sys.exit()
 
         arguments = vars(args)
@@ -139,16 +139,18 @@ class EdgeGridConfig():
             config = ConfigParser()
             config.readfp(open(arguments["edgerc"]))
             if not config.has_section(configuration):
-                err_msg = "ERROR: No section named %s was found in your %s file\n" % (configuration, arguments["edgerc"])
+                err_msg = "ERROR: No section named %s was found in your %s file\n" % \
+                           (configuration, arguments["edgerc"])
                 err_msg += "ERROR: Please generate credentials for the script functionality\n"
                 err_msg += "ERROR: and run 'python gen_edgerc.py %s' to generate the credential file\n" % configuration
-                sys.exit( err_msg )
+                sys.exit(err_msg)
             for key, value in config.items(configuration):
                 # ConfigParser lowercases magically
                 if key not in arguments or arguments[key] is None:
                     arguments[key] = value
                 else:
-                    print("Missing configuration file.  Run python gen_edgerc.py to get your credentials file set up once you've provisioned credentials in LUNA.")
+                    print("Missing configuration file.  Run python gen_edgerc.py to get your credentials file "
+                          "set up once you've provisioned credentials in LUNA.")
                     return None
 
         for option in arguments:
@@ -158,3 +160,4 @@ class EdgeGridConfig():
 
     def create_base_url(self):
         self.base_url = "https://%s" % self.host
+    
