@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020 Akamai Technologies, Inc. All Rights Reserved
+# Copyright 2021 Akamai Technologies, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth
 from config import EdgeGridConfig
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 #: Data collection delay, default is 30 minutes
 collection_delay_min = 30
@@ -65,14 +65,17 @@ session.headers.update({'User-Agent': "Akamai-CLI etp/%s" % __version__})
 headers = {'content-type': "application/json;charset=UTF-8"}
 baseurl = '%s://%s' % ('https', config.host)
 
+
 class ETPListType(Enum):
     """See https://developer.akamai.com/api/enterprise_security/enterprise_threat_protector_configuration/v1.html"""
     IP = "LIST_TYPE_IP"
     DOMAIN = "LIST_TYPE_DOMAIN"
 
+
 class ETPConfidence(Enum):
     SUSPECTED = 1
     KNOWN = 2
+
 
 def exit_fromresponse(response):
     """
@@ -91,11 +94,13 @@ def exit_fromresponse(response):
         sys.stderr.write("ERROR: Exiting with code %s, reason: %s\n" % (response.status_code, reason))
         exit(response.status_code)
 
+
 def force_unicode(s):
     if sys.version_info.major == 2:
         return unicode(s)
     else:
         return s
+
 
 def type_hostorip(hostorip):
     """
@@ -110,6 +115,7 @@ def type_hostorip(hostorip):
         return ETPListType.IP
     except ValueError:
         return ETPListType.DOMAIN
+
 
 def iphost_argument_tolist(config):
     for item in config.iporhost:
@@ -136,12 +142,12 @@ def fetch_events(config, output):
     def exit_gracefully(signum, frame):
         stop_event.set()
 
-    if config.tail: # The window span is show so we can keep adding content by small increment
+    if config.tail:  # The window span is show so we can keep adding content by small increment
         start = int(time.time()) - (collection_delay_min * 60) - poll_interval_sec
         end = start + poll_interval_sec
         signal.signal(signal.SIGTERM, exit_gracefully)
         signal.signal(signal.SIGINT, exit_gracefully)
-    else: # Larger window span
+    else:  # Larger window span
         start = int(time.time()) - (collection_delay_min * 60) - (span_duration_min * 60)
         if config.start:
             start = config.start
@@ -149,23 +155,50 @@ def fetch_events(config, output):
         if config.end:
             end = config.end
     try:
+        pageSize = 5000  # our recommend value is 5000
         while not stop_event.is_set():
-            timing_s = time.time() # The fetch operation can take a while
-            event_url = ('%(baseurl)s/etp-report/v1/configs/%(config_id)s/%(event_type)s-events/details'
-                        '?startTimeSec=%(start)s&endTimeSec=%(end)s') % {
+            pageNumber = 1
+            numOfPages = 0
+            while numOfPages == 0 or pageNumber <= numOfPages:
+                post_data = {
+                    'startTimeSec': start,
+                    'endTimeSec': end,
+                    'orderBy': "DESC",
+                    'pageNumber': pageNumber,
+                    'pageSize': pageSize,
+                    'filters': {}
+                }
+
+                timing_s = time.time()  # The fetch operation can take a while
+                event_url = '%(baseurl)s/etp-report/v3/configs/%(config_id)s/%(event_type)s-events/details' % \
+                    {
                         'baseurl': baseurl,
                         'config_id': config.etp_config_id,
-                        'event_type': config.event_type,
-                        'start': start,
-                        'end': end
-                        }
-            LOG.info("{OPEN} API URL: %s" % event_url)
-            r = session.get(event_url, headers=headers)
-            LOG.info("{OPEN} API call took %.2f seconds" % (time.time() - timing_s))
-            for e in r.json():
-                output.write("%s\n" % json.dumps(e))
-                event_count += 1
-            output.flush()
+                        'event_type': config.event_type
+                    }
+                LOG.info("{OPEN} API URL: %s" % event_url)
+                LOG.info("{OPEN} API POST param %s" % post_data)
+                r = session.post(event_url, json=post_data, headers=headers)
+                LOG.info("{OPEN} API response code is HTTP/%s, body %s bytes" % (r.status_code, len(r.content)))
+                if r.status_code != 200:
+                    LOG.error(r.content)
+                    break
+                LOG.info("{OPEN} API call took %.2f seconds" % (time.time() - timing_s))
+                response_data = r.json()
+
+                # Determine maximum page size based on the totalRecords of the first requests reply
+                if numOfPages == 0:
+                    LOG.info("Page info: %s" % response_data.get("pageInfo", {}))
+                    total_records = response_data["pageInfo"]["totalRecords"]
+                    numOfPages = int((total_records / pageSize) + 1)
+                    LOG.info("Calculated number of pages: %s (based on %s)" % (numOfPages, total_records))
+
+                for e in response_data.get('dataRows', []):
+                    output.write("%s\n" % json.dumps(e))
+                    event_count += 1
+                output.flush()
+                pageNumber += 1
+                LOG.info("%s events reported so far." % event_count)
             if not config.tail:
                 break
             else:
@@ -184,6 +217,7 @@ def fetch_events(config, output):
     finally:
         LOG.info("%d event(s) fetched in total" % event_count)
 
+
 def list_add_or_delete(config):
     # Maps security command line argument with dict key
     action_key = "add"
@@ -193,11 +227,11 @@ def list_add_or_delete(config):
     if action_key == "add" and config.suspect:
         confidence = ETPConfidence.SUSPECTED
 
-    LOG.info("%s %s to the list %s (confidence: %s)" % 
+    LOG.info("%s %s to the list %s (confidence: %s)" %
              (action_key, config.iporhost, config.listid, confidence))
 
-    add_item_url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/%s/items" % 
-        (config.etp_config_id, config.listid))
+    add_item_url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/%s/items" %
+                           (config.etp_config_id, config.listid))
 
     LOG.info("Webservice URL: %s" % add_item_url)
 
@@ -211,13 +245,13 @@ def list_add_or_delete(config):
                 "type": type_hostorip(item).value,
                 "value": item,
                 "confidenceLevelId": confidence.value
-                }) 
+            })
         else:
-             change[action_key].append(item)
+            change[action_key].append(item)
     if verbose:
         print("== payload ===")
         print(json.dumps(change))
-    
+
     r = session.patch(add_item_url,  data=json.dumps(change), headers=headers)
     exit_fromresponse(r)
 
@@ -279,8 +313,10 @@ def log_level():
 
 def main():
 
-    logging.basicConfig(filename=config.logfile, level=log_level(),
-        format='%(asctime)s [%(levelname)s] %(threadName)s %(message)s')
+    logging.basicConfig(
+        filename=config.logfile, level=log_level(),
+        format='%(asctime)s [%(levelname)s] %(threadName)s %(message)s'
+    )
 
     LOG.info("Python %s" % sys.version)
     LOG.info("PID: %s" % os.getpid())
@@ -326,8 +362,8 @@ def main():
                 url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
                 r = session.get(url, headers=headers)
                 if r.status_code == 200:
-                    for l in r.json():
-                        print("%s,%s" % (l.get("id"), l.get('name')))
+                    for list_item in r.json():
+                        print("%s,%s" % (list_item.get("id"), list_item.get('name')))
                 exit_fromresponse(r)
         else:
             sys.stderr.write("Action %s not implemented.\n" % config.list_action)
@@ -340,7 +376,6 @@ def main():
             ioc.timeseries(config.domain)
         elif config.ioc_action == "changes":
             ioc.changes(config.domain)
-        
     elif config.command == "version":
         print(__version__)
 
