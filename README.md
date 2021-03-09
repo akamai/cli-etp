@@ -20,15 +20,15 @@
 ## Introduction
 
 Enterprise Threat Protector (ETP) comes with a full suite of APIs. 
-Yet you need to build scripts to be able to interact with the service.
+Yet you still need to build scripts to be able to interact with the service.
 
-That's where Akamai CLI toolkit greatly help, no longer script to wrote yourself, you can run very common operations directly from the command line.
+That's where Akamai CLI toolkit greatly helps, no longer do you need to write scripts yourself, you can run common operations directly from the command line.
 
 ## Prerequisites
 
 ### Akamai CLI
 
-You'll need the CLI toolkit, available on many platform.
+You'll need the CLI toolkit, available on most platform.
 
 Please visit the [Getting Started](https://developer.akamai.com/cli/docs/getting-started) guide on developer.akamai.com.
 
