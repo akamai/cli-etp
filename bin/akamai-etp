@@ -26,15 +26,16 @@ import signal
 from threading import Event
 from enum import Enum
 import logging
+from urllib.parse import parse_qs
 
 # 3rd party modules
 
 import requests
 from requests.compat import urljoin
-from akamai.edgegrid import EdgeGridAuth
+from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 #: Data collection delay, default is 30 minutes
 collection_delay_min = 30
@@ -64,6 +65,7 @@ session.auth = EdgeGridAuth(
 session.headers.update({'User-Agent': "Akamai-CLI etp/%s" % __version__})
 headers = {'content-type': "application/json;charset=UTF-8"}
 baseurl = '%s://%s' % ('https', config.host)
+extra_qs = None
 
 
 class ETPListType(Enum):
@@ -132,6 +134,27 @@ def iphost_argument_tolist(config):
             yield force_unicode(item)
 
 
+def build_params(params=None):
+    """
+    Prepare querystring arguments as key value pair
+
+    Args:
+        params (dict, optional): Querystring Arguments as key-value dict. Defaults to None.
+
+    Returns:
+        dict: Fully constructed KV dict
+    """
+    if isinstance(params, dict):
+        final_params = params.copy()
+    else:
+        final_params = {}
+    edgerc = EdgeRc(config.edgerc)
+    scanned_extra_qs = edgerc.get(config.section, 'extra_qs', fallback=None)
+    if scanned_extra_qs:
+        final_params.update(parse_qs(scanned_extra_qs))
+    return final_params
+
+
 def fetch_events(config, output):
     """
     Fetch all events
@@ -178,7 +201,7 @@ def fetch_events(config, output):
                     }
                 LOG.info("{OPEN} API URL: %s" % event_url)
                 LOG.info("{OPEN} API POST param %s" % post_data)
-                r = session.post(event_url, json=post_data, headers=headers)
+                r = session.post(event_url, params=build_params(), json=post_data, headers=headers)
                 LOG.info("{OPEN} API response code is HTTP/%s, body %s bytes" % (r.status_code, len(r.content)))
                 if r.status_code != 200:
                     LOG.error(r.content)
@@ -252,7 +275,7 @@ def list_add_or_delete(config):
         print("== payload ===")
         print(json.dumps(change))
 
-    r = session.patch(add_item_url,  data=json.dumps(change), headers=headers)
+    r = session.patch(add_item_url,  params=build_params(), data=json.dumps(change), headers=headers)
     exit_fromresponse(r)
 
 
@@ -264,7 +287,7 @@ class ioc:
     def isrisky(domain):
         params = {'record': domain, 'recordType': ioc.recordType}
         path = '/etp-report/v1/ioc/domain-tree'
-        resp = session.get(urljoin(baseurl, path), params=params)
+        resp = session.get(urljoin(baseurl, path), params=build_params(params))
         LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
         domaintree = resp.json()
         return len(domaintree) > 0
@@ -274,7 +297,7 @@ class ioc:
         """IOC information about the domain."""
         params = {'record': domain, 'recordType': ioc.recordType}
         path = '/etp-report/v1/ioc/information'
-        resp = session.get(urljoin(baseurl, path), params=params)
+        resp = session.get(urljoin(baseurl, path), params=build_params(params))
         LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
         print(resp.text)
 
@@ -283,7 +306,7 @@ class ioc:
         """IOC time series about the domain."""
         params = {'record': domain, 'recordType': ioc.recordType}
         path = "/etp-report/v1/configs/100/ioc/time-series"
-        resp = session.get(urljoin(baseurl, path), params=params)
+        resp = session.get(urljoin(baseurl, path), params=build_params(params))
         LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
         data = resp.json()
         if len(data.get('rows', [])) > 0:
@@ -297,7 +320,7 @@ class ioc:
         """IOC observed changes on a domain."""
         params = {'record': domain, 'recordType': ioc.recordType}
         path = '/etp-report/v1/ioc/changes'
-        resp = session.get(urljoin(baseurl, path), params=params)
+        resp = session.get(urljoin(baseurl, path), params=build_params(params))
         LOG.info("API: %s returns HTTP/%s" % (path, resp.status_code))
         print(resp.text)
 
@@ -345,7 +368,7 @@ def main():
                 "id": config.listid,
                 "status": "PENDING"
             }
-            r = session.post(url, data=json.dumps(payload), headers=headers)
+            r = session.post(url, params=build_params(), data=json.dumps(payload), headers=headers)
             exit_fromresponse(r)
         elif config.list_action == "get":
             if config.listid:
@@ -353,14 +376,14 @@ def main():
                     configId=config.etp_config_id,
                     listId=config.listid
                 ))
-                r = session.get(url, headers=headers)
+                r = session.get(url, params=build_params(), headers=headers)
                 if r.status_code == 200:
                     for dom in r.json().get("items", []):
                         print(dom.get('value'))
                 exit_fromresponse(r)
             else:
                 url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
-                r = session.get(url, headers=headers)
+                r = session.get(url, params=build_params(), headers=headers)
                 if r.status_code == 200:
                     for list_item in r.json():
                         print("%s,%s" % (list_item.get("id"), list_item.get('name')))
