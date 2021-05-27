@@ -35,7 +35,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 #: Data collection delay, default is 30 minutes
 collection_delay_min = 30
@@ -155,6 +155,20 @@ def build_params(params=None):
     return final_params
 
 
+def input2feed(event_type):
+    api_eventtype = None
+    if event_type == "threat":
+        api_eventtype = "threat-events"
+    elif event_type == "aup":
+        api_eventtype = "aup-events"
+    elif event_type == "dns":
+        api_eventtype = "dns-activities"
+    elif event_type == "proxy":
+        api_eventtype = "proxy-traffic/transactions"
+    if api_eventtype is None:
+        raise ValueError(f'event_type provided is support supported: {event_type}')
+    return api_eventtype
+
 def fetch_events(config, output):
     """
     Fetch all events
@@ -193,11 +207,11 @@ def fetch_events(config, output):
                 }
 
                 timing_s = time.time()  # The fetch operation can take a while
-                event_url = '%(baseurl)s/etp-report/v3/configs/%(config_id)s/%(event_type)s-events/details' % \
+                event_url = '%(baseurl)s/etp-report/v3/configs/%(config_id)s/%(event_type)s/details' % \
                     {
                         'baseurl': baseurl,
                         'config_id': config.etp_config_id,
-                        'event_type': config.event_type
+                        'event_type': input2feed(config.event_type)
                     }
                 LOG.info("{OPEN} API URL: %s" % event_url)
                 LOG.info("{OPEN} API POST param %s" % post_data)

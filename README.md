@@ -120,6 +120,8 @@ You can also pipe the command to another process like your favorite JSON parser 
 $ akamai etp event aup --start 1576877365 --end 1576878265|jq .
 ```
 
+Other event available are DNS activity (use `dns`) and Proxy Traffic (use `proxy`)
+
 ### Manage security lists
 
 Get the lists available on the account

@@ -49,7 +49,7 @@ class EdgeGridConfig():
         event_parser = subparsers.add_parser("event", help="Fetch last events (from 1h15 ago to 1 hour ago)",
                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         event_parser.add_argument('event_type', nargs='?', default="threat", 
-                                  choices=['threat', 'aup'], help="Event type, threat or Acceptable User Policy (AUP)")
+                                  choices=['threat', 'aup', 'dns', 'proxy'], help="Event type, Threat, Acceptable User Policy (AUP), DNS or Proxy")
         event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 1h15 ago")
         event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is start + 15 minutes")
         event_parser.add_argument('--output', '-o', help="Output file, default is stdout. Encoding is utf-8.")
