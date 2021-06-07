@@ -35,7 +35,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.3.3"
+__version__ = "0.3.4"
 
 #: Data collection delay, default is 30 minutes
 collection_delay_min = 30
@@ -62,7 +62,7 @@ session.auth = EdgeGridAuth(
     access_token=config.access_token
 )
 
-session.headers.update({'User-Agent': "Akamai-CLI etp/%s" % __version__})
+session.headers.update({'User-Agent': f"{config.ua_prefix} cli-etp/{__version__}"})
 headers = {'content-type': "application/json;charset=UTF-8"}
 baseurl = '%s://%s' % ('https', config.host)
 extra_qs = None
@@ -245,7 +245,7 @@ def fetch_events(config, output):
                 # TODO: add a better/more resilient logic
                 sleep_time = max(0, poll_interval_sec - (time.time() - timing_s))
                 if sleep_time == 0:
-                    LOG.WARN("Potential data gaps")
+                    LOG.warn("Potential data gaps")
                 LOG.info("Sleeping for %.2f sec..." % sleep_time)
                 stop_event.wait(sleep_time)
                 start = int(time.time()) - (collection_delay_min * 60) - poll_interval_sec

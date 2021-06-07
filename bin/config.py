@@ -102,6 +102,7 @@ class EdgeGridConfig():
                             help=' Location of the credentials file (default is ~/.edgerc)')
         parser.add_argument('--section', '-c', default='default', metavar='credentials_file_section', action='store', 
                             help=' Credentials file Section\'s name to use')
+        parser.add_argument('--user-agent-prefix', dest='ua_prefix', default='Akamai-CLI', help=argparse.SUPPRESS)
 
         if flags:
             for argument in flags.keys():
