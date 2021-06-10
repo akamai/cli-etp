@@ -372,6 +372,7 @@ def main():
 
     if not config.command:
         config.parser.print_help()
+        sys.exit(0)
     elif config.command == "version":
         print(__version__)
         sys.exit(0)
