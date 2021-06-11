@@ -19,15 +19,8 @@ import sys
 import os
 import argparse
 import logging
-
-if sys.version_info[0] >= 3:
-    # python3
-    from configparser import ConfigParser
-    import http.client as http_client
-else:
-    # python2.7
-    from ConfigParser import ConfigParser
-    import httplib as http_client
+from configparser import ConfigParser
+import http.client as http_client
 
 
 epilog = '''Copyright (C) Akamai Technologies, Inc\n''' \
@@ -57,6 +50,10 @@ class EdgeGridConfig():
                                   help="""Do not stop when most recent log is reached,\n"""
                                        """rather to wait for additional data to be appended\n"""
                                        """to the input. --start and --end are ignored when used.""")
+        event_parser.add_argument('--poll', type=int, default=60,
+                                  help="How often we pull data in tail mode")
+        event_parser.add_argument('--limit', type=int, default=3*60*60,
+                                  help="Stop the most recent fetch to now minus specified seconds, default is 3 hours. Applicable to --tail")
 
         list_parser = subparsers.add_parser("list", help="Manage ETP security list",
                                             epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
@@ -160,5 +157,6 @@ class EdgeGridConfig():
         self.create_base_url()
 
     def create_base_url(self):
-        self.base_url = "https://%s" % self.host
+        if hasattr(self, 'host'):
+            self.base_url = "https://%s" % self.host
     

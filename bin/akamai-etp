@@ -35,37 +35,32 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.3.4"
+__version__ = "0.3.5"
 
-#: Data collection delay, default is 30 minutes
-collection_delay_min = 30
 #: Window span in ad-hoc mode, default is 15 min
 span_duration_min = 15
-#: How often we poll in --tail mode, default is 60 sec
-poll_interval_sec = 60
 
 session = requests.Session()
 verbose = False
 section_name = "default"
+headers = {'content-type': "application/json;charset=UTF-8"}
+extra_qs = None
 
 LOG = logging.getLogger(__name__)
 
 # If all parameters are set already, use them.  Otherwise
 # use the config
 config = EdgeGridConfig({"verbose": False}, section_name)
+
+#: Verbose mode, configurable with -v or --verbose
 verbose = getattr(config, "verbose", False)
+#: Fetch limit in seconds, configurable with --limit
+fetch_limit = getattr(config, "limit", 3 * 60 * 60)
+#: Poll interval (also defin how much data we get each time)
+#: Default is 5 minutes, configurable with --poll
+poll_interval_sec = getattr(config, "poll", 60)
 
-# Set auth
-session.auth = EdgeGridAuth(
-    client_token=config.client_token,
-    client_secret=config.client_secret,
-    access_token=config.access_token
-)
-
-session.headers.update({'User-Agent': f"{config.ua_prefix} cli-etp/{__version__}"})
-headers = {'content-type': "application/json;charset=UTF-8"}
-baseurl = '%s://%s' % ('https', config.host)
-extra_qs = None
+baseurl = '%s://%s' % ('https', getattr(config, "host", "host-not-set-in-config"))
 
 
 class ETPListType(Enum):
@@ -175,17 +170,18 @@ def fetch_events(config, output):
     """
     stop_event = Event()
     event_count = 0
+    byte_count = 0
 
     def exit_gracefully(signum, frame):
         stop_event.set()
 
     if config.tail:  # The window span is show so we can keep adding content by small increment
-        start = int(time.time()) - (collection_delay_min * 60) - poll_interval_sec
+        start = int(time.time()) - fetch_limit - poll_interval_sec
         end = start + poll_interval_sec
         signal.signal(signal.SIGTERM, exit_gracefully)
         signal.signal(signal.SIGINT, exit_gracefully)
     else:  # Larger window span
-        start = int(time.time()) - (collection_delay_min * 60) - (span_duration_min * 60)
+        start = int(time.time()) - fetch_limit - (span_duration_min * 60)
         if config.start:
             start = config.start
         end = start + (span_duration_min * 60)
@@ -196,6 +192,7 @@ def fetch_events(config, output):
         while not stop_event.is_set():
             pageNumber = 1
             numOfPages = 0
+            event_interval_count = 0
             while numOfPages == 0 or pageNumber <= numOfPages:
                 post_data = {
                     'startTimeSec': start,
@@ -215,7 +212,8 @@ def fetch_events(config, output):
                     }
                 LOG.info("{OPEN} API URL: %s" % event_url)
                 LOG.info("{OPEN} API POST param %s" % post_data)
-                r = session.post(event_url, params=build_params(), json=post_data, headers=headers)
+                r = session.post(event_url, params=build_params(), json=post_data, headers=headers, timeout=min(300, poll_interval_sec*2))
+                byte_count += len(r.content)
                 LOG.info("{OPEN} API response code is HTTP/%s, body %s bytes" % (r.status_code, len(r.content)))
                 if r.status_code != 200:
                     LOG.error(r.content)
@@ -233,9 +231,10 @@ def fetch_events(config, output):
                 for e in response_data.get('dataRows', []):
                     output.write("%s\n" % json.dumps(e))
                     event_count += 1
+                    event_interval_count += 1
                 output.flush()
                 pageNumber += 1
-                LOG.info("%s events reported so far." % event_count)
+                LOG.info(f"{event_interval_count} event(s) for current {poll_interval_sec}s interval [{start} -> {end}], {pageNumber - 1} page(s).")
             if not config.tail:
                 break
             else:
@@ -245,14 +244,23 @@ def fetch_events(config, output):
                 # TODO: add a better/more resilient logic
                 sleep_time = max(0, poll_interval_sec - (time.time() - timing_s))
                 if sleep_time == 0:
-                    LOG.warn("Potential data gaps")
-                LOG.info("Sleeping for %.2f sec..." % sleep_time)
-                stop_event.wait(sleep_time)
-                start = int(time.time()) - (collection_delay_min * 60) - poll_interval_sec
-                end = start + poll_interval_sec
-                LOG.info("Next cycle will be from %s to %s..." % (start, end))
+                    LOG.warning(f"Drifting, consider increase the poll interval (currently {poll_interval_sec}s)")
+                if not stop_event.wait(sleep_time):
+                    LOG.info("Sleeping for %.2f sec..." % sleep_time)
+                    # prior to 0.3.5
+                    # start = int(time.time()) - fetch_limit - poll_interval_sec
+                    # end = start + poll_interval_sec
+                    # after 0.3.5
+                    start = end # next cycle resume where we finish this one
+                    end = int(time.time()) - fetch_limit # the window ends at now - limit
+                    LOG.info(f"Next cycle will be from {start} to {end} [{end - start}s]...")
+    except KeyboardInterrupt:
+        stop_event.set()
+        LOG.warning("Keyboard interrupt detected")
+    except requests.exceptions.ReadTimeout:
+        LOG.warning(f"Request timeout, consider increase poll interval (currently {poll_interval_sec}s)")
     finally:
-        LOG.info("%d event(s) fetched in total" % event_count)
+        LOG.info(f"{event_count} event(s) fetched in total, {byte_count} byte(s)")
 
 
 def list_add_or_delete(config):
@@ -352,13 +360,30 @@ def main():
 
     logging.basicConfig(
         filename=config.logfile, level=log_level(),
-        format='%(asctime)s [%(levelname)s] %(threadName)s %(message)s'
+        format='%(asctime)s %(levelname).1s %(message)s'
     )
 
     LOG.info("Python %s" % sys.version)
     LOG.info("PID: %s" % os.getpid())
     LOG.info("Command is: %s" % config.command)
-    LOG.info("ETP Config ID: %s" % config.etp_config_id)
+    LOG.info("ETP Config ID: %s" % getattr(config, 'etp_config_id', None))
+    LOG.info(f"Tail fetch limit: {fetch_limit} seconds")
+    LOG.info(f"Tail poll interval: {poll_interval_sec} seconds")
+
+    if not config.command:
+        config.parser.print_help()
+        sys.exit(0)
+    elif config.command == "version":
+        print(__version__)
+        sys.exit(0)
+
+    # Initialize Requests Session for the API calls
+    session.auth = EdgeGridAuth(
+        client_token=config.client_token,
+        client_secret=config.client_secret,
+        access_token=config.access_token
+    )
+    session.headers.update({'User-Agent': f"{config.ua_prefix} cli-etp/{__version__}"})
 
     if config.command == "event":
         if config.output is None:
@@ -413,9 +438,6 @@ def main():
             ioc.timeseries(config.domain)
         elif config.ioc_action == "changes":
             ioc.changes(config.domain)
-    elif config.command == "version":
-        print(__version__)
-
 
 if __name__ == '__main__':
     main()
