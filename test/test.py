@@ -27,9 +27,13 @@ import subprocess
 import shlex
 import time
 from pathlib import Path
+import collections
+import tempfile
+import os
 
 # Global variables
 encoding = 'utf-8'
+
 
 class CliETPTest(unittest.TestCase):
     testdir = None
@@ -51,9 +55,20 @@ class CliETPTest(unittest.TestCase):
 
     def line_count(filename):
         count = 0
-        for line in open(filename).xreadlines(): 
-            count += 1
+        with open(filename) as f:
+            while next(f, False):
+                count += 1
         return count
+
+    def duplicate_count(filename):
+        total_count = 0
+        with open(filename) as infile:
+            counts = collections.Counter(l.strip() for l in infile)
+        for line, count in counts.most_common():
+            if count > 1:
+                print(f"DUPLICATE[{count}] {line}")
+                total_count += 1
+        return total_count
 
 
 class TestEvents(CliETPTest):
@@ -83,6 +98,28 @@ class TestEvents(CliETPTest):
         self.assertGreater(event_count, 0, "We expect at least one AUP event")
         self.assertEqual(cmd.returncode, 0, 'return code must be 0')
 
+    def test_event_aup_file(self):
+        """
+        Fetch AUP events, export as a file
+        """
+        output_handle, output_filename = tempfile.mkstemp()
+        try:
+            cmd = self.cli_run("event", "aup", "--start", self.after, "--end", self.before, '--output', output_filename)
+            stdout, stderr = cmd.communicate(timeout=120)
+            self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+            line_count = TestCliETP.line_count(output_filename)
+            print(f"Output contains {line_count} lines")
+            duplicate_count = CliETPTest.duplicate_count(output_filename)
+            self.assertGreater(line_count, 0, "We expect at least a few events")
+            print(f"We found {duplicate_count} duplicates")
+            self.assertEqual(duplicate_count, 0)
+
+        finally:
+            if os.path.isfile(output_filename):
+                os.remove(output_filename)
+
+
+
 class TestCliETP(CliETPTest):
 
     def test_no_edgerc(self):
@@ -103,6 +140,7 @@ class TestCliETP(CliETPTest):
         stdout, stderr = cmd.communicate()
         self.assertRegex(stdout.decode(encoding), r'[0-9]+\.[0-9]+\.[0-9]+\n', 'Version should be x.y.z')
         self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+
 
 if __name__ == '__main__':
     unittest.main()
