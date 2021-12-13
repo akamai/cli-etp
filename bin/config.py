@@ -97,6 +97,8 @@ class EdgeGridConfig():
 
         parser.add_argument('--edgerc', '-e', default='~/.edgerc', metavar='credentials_file', 
                             help=' Location of the credentials file (default is ~/.edgerc)')
+        parser.add_argument('--proxy', '-p', default='', help=''' HTTP/S Proxy Host/IP and port number,'''
+                                                              ''' do not use prefix (e.g. 10.0.0.1:8888)''')
         parser.add_argument('--section', '-c', default='default', metavar='credentials_file_section', action='store', 
                             help=' Credentials file Section\'s name to use')
         parser.add_argument('--user-agent-prefix', dest='ua_prefix', default='Akamai-CLI', help=argparse.SUPPRESS)

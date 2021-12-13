@@ -35,12 +35,12 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.3.5"
+__version__ = "0.3.6"
 
 #: Window span in ad-hoc mode, default is 15 min
 span_duration_min = 15
 
-session = requests.Session()
+session = None
 verbose = False
 section_name = "default"
 headers = {'content-type': "application/json;charset=UTF-8"}
@@ -58,7 +58,7 @@ verbose = getattr(config, "verbose", False)
 fetch_limit = getattr(config, "limit", 3 * 60 * 60)
 #: Poll interval (also defin how much data we get each time)
 #: Default is 5 minutes, configurable with --poll
-poll_interval_sec = getattr(config, "poll", 60)
+poll_interval_sec = getattr(config, "poll", 600)
 
 baseurl = '%s://%s' % ('https', getattr(config, "host", "host-not-set-in-config"))
 
@@ -355,8 +355,32 @@ def log_level():
     else:
         return logging.ERROR
 
+def prepare_session(config):
+    """
+    Prepare a Session object to issue request against Akamai {OPEN} API
+    """
+    s = requests.Session()
+
+    # Initialize Requests Session for the API calls
+    s.auth = EdgeGridAuth(
+        client_token=config.client_token,
+        client_secret=config.client_secret,
+        access_token=config.access_token
+    )
+
+    # Proxy
+    if config.proxy:
+        LOG.info("Set proxy to %s" % config.proxy)
+        s.proxies['https'] = 'http://%s' % config.proxy
+
+    # User agent, with an optional prefix
+    s.headers.update({'User-Agent': f"{config.ua_prefix} cli-etp/{__version__}"})
+
+    return s
 
 def main():
+
+    global session
 
     logging.basicConfig(
         filename=config.logfile, level=log_level(),
@@ -377,13 +401,7 @@ def main():
         print(__version__)
         sys.exit(0)
 
-    # Initialize Requests Session for the API calls
-    session.auth = EdgeGridAuth(
-        client_token=config.client_token,
-        client_secret=config.client_secret,
-        access_token=config.access_token
-    )
-    session.headers.update({'User-Agent': f"{config.ua_prefix} cli-etp/{__version__}"})
+    session = prepare_session(config)
 
     if config.command == "event":
         if config.output is None:

@@ -8,6 +8,7 @@
 - [Install](#install)
   - [API User and configuration file](#api-user-and-configuration-file)
 - [Updating ETP CLI module](#updating-etp-cli-module)
+- [Using a proxy](#using-a-proxy)
 - [Examples](#examples)
   - [Fetch events](#fetch-events)
   - [Manage security lists](#manage-security-lists)
@@ -73,6 +74,17 @@ To update to the latest version:
 
 ```
 $ akamai update etp
+```
+
+## Using a proxy
+
+Your organization may require to use a proxy server to reach to the public internet.
+Use the `--proxy` option, and if you need to pass a specific private CA certificate you may
+use the REQUESTS_CA_BUNDLE environment variable.
+
+Example on a Unix based OS:
+```
+$ REQUESTS_CA_BUNDLE=~/ssl-proxying-certificate.pem akamai etp --proxy 127.0.0.1:8888 list get
 ```
 
 ## Examples
