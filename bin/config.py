@@ -39,6 +39,7 @@ class EdgeGridConfig():
         parser = self.parser
         subparsers = parser.add_subparsers(dest="command", help='ETP object to manipulate')
 
+        # Security Events
         event_parser = subparsers.add_parser("event", help="Fetch last events (from 1h15 ago to 1 hour ago)",
                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         event_parser.add_argument('event_type', nargs='?', default="threat", 
@@ -55,6 +56,7 @@ class EdgeGridConfig():
         event_parser.add_argument('--limit', type=int, default=3*60*60,
                                   help="Stop the most recent fetch to now minus specified seconds, default is 3 hours. Applicable to --tail")
 
+        # ETP Lists
         list_parser = subparsers.add_parser("list", help="Manage ETP security list",
                                             epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         subsub = list_parser.add_subparsers(dest="list_action", help='List action')
@@ -78,6 +80,7 @@ class EdgeGridConfig():
                                        epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listdeploy.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
 
+        # IOC
         ioc_parser = subparsers.add_parser("ioc", help="Manage Indicator of Compromise (IOC) feed intelligence",
                                            epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         iocsubsub = ioc_parser.add_subparsers(dest="ioc_action", help='List action')
@@ -88,6 +91,18 @@ class EdgeGridConfig():
         ioc_changes = iocsubsub.add_parser("changes", help="Information on a particular internet domain")
         ioc_changes.add_argument('domain', type=str, metavar='domain', help='Internet domain (eg. example.com)')
 
+        # Sub-tenants
+        tenant_parser = subparsers.add_parser("tenant", help="Manage ETP Account sub-tenants",
+                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+        tenant_operation = tenant_parser.add_subparsers(dest="operation", help='Sub-tenant operation')
+        tenant_list = tenant_operation.add_parser("list", help="List all tenants in the account",
+                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+        tenant_reportclient = tenant_operation.add_parser("clients", help="Active ETP Client for the last 30 days per tenant",
+                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+        tenant_reportclient.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 1h ago")
+        tenant_reportclient.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is now")
+
+        # General options
         subparsers.add_parser("version", help="Display CLI ETP module version", 
                               epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
 

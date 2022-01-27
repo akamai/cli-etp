@@ -15,6 +15,9 @@
     - [Add items to a list](#add-items-to-a-list)
     - [Deploy list changes](#deploy-list-changes)
   - [Query Akamai IOC inteligence database](#query-akamai-ioc-inteligence-database)
+- [Reporting](#reporting)
+  - [List of sub-tenants](#list-of-sub-tenants)
+  - [Active ETP Client by sub-tenant](#active-etp-client-by-sub-tenant)
 - [Troubleshooting](#troubleshooting)
   - [ERROR: Exiting with code 404, reason: Code-130009](#error-exiting-with-code-404-reason-code-130009)
 
@@ -200,6 +203,41 @@ $ akamai etp list deploy 11603
 $ akamai etp ioc info akamaietpmalwaretest.com
 $ akamai etp ioc changes akamaietpmalwaretest.com
 $ akamai etp ioc timeseries akamaietpmalwaretest.com
+```
+
+## Reporting
+
+### List of sub-tenants
+
+List all the sub tenants in the account, with their respective ETP Config ID and name
+```
+$ akamai etp tenant list
+# Command: akamai etp tenant list
+# config_id, tenant_name
+12345,Tenant A
+23456,Tenant B
+34567,Tenant C
+45678,Tenant D
+56789,Tenant E
+```
+
+### Active ETP Client by sub-tenant
+
+Report number of active ETP clients for the last 30 days by sub-tenant.
+You can specify the time interval passing EPOCH integer as `--start` and `--end`.
+CSV output headers are sent to *stderr*, body with the rows are sent to *stdout* to allow to pipe commands.
+
+```
+$ akamai etp tenant clients
+# Command: akamai etp tenant clients
+# Report start: 1640721997
+# Report end: 1643313997
+# config_id, tenant_name, active_client_count
+12345,Tenant A,10
+23456,Tenant B,20
+34567,Tenant C,30
+45678,Tenant D,40
+56789,Tenant E,50
 ```
 
 ## Troubleshooting

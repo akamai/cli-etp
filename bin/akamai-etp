@@ -27,6 +27,7 @@ from threading import Event
 from enum import Enum
 import logging
 from urllib.parse import parse_qs
+import csv
 
 # 3rd party modules
 
@@ -35,7 +36,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.3.6"
+__version__ = "0.3.7"
 
 #: Window span in ad-hoc mode, default is 15 min
 span_duration_min = 15
@@ -149,6 +150,33 @@ def build_params(params=None):
         final_params.update(parse_qs(scanned_extra_qs))
     return final_params
 
+
+class cli:
+    """
+    Various shared functions for CLI
+    """
+    @staticmethod
+    def write(s):
+        print(s)
+    
+    @staticmethod
+    def write_header(s):
+        sys.stderr.write(s)
+        sys.stderr.write("\n")
+
+    @staticmethod
+    def write_footer(s):
+        cli.write_header(s)
+
+    @staticmethod
+    def write_columns(row):
+        writer = csv.writer(sys.stdout)
+        writer.writerow(row)
+
+    @staticmethod
+    def current_command():
+        return "akamai etp " + " ".join(sys.argv[1:])
+    
 
 def input2feed(event_type):
     api_eventtype = None
@@ -347,6 +375,59 @@ class ioc:
         print(resp.text)
 
 
+class report:
+
+    @staticmethod
+    def active_clients(start, end, configId=None):
+        path = '/etp-config/v3/configs/{configId}/client/status'.format(configId = configId or config.etp_config_id)
+        params = {'startTimeSec': start, 'endTimeSec': end}
+        resp = session.get(urljoin(baseurl, path), params=build_params(params))
+        grand_total = 0
+        for os in resp.json().get('installed', []):
+            grand_total += os.get('total', 0)
+        return grand_total
+
+
+class tenant:
+    """
+    Operate on sub-tenants, ETP feature introduce late 2021.
+    """
+    @staticmethod
+    def _get_all():
+        path = '/etp-config/v3/configs/{configId}/tenants'.format(configId = config.etp_config_id)
+        resp = session.get(urljoin(baseurl, path))
+        if resp.status_code != 200:
+            sys.stderr.write(f"Error fetching tenants:\n{resp.text}\n")
+            sys.exit(2)
+        return resp.json()
+
+    @staticmethod
+    def list():
+        tenants = tenant._get_all()
+        cli.write_header('# Command: {0}'.format(cli.current_command()))
+        cli.write_header("# ConfigID, name")
+        for t in tenants:
+            cli.write_columns((t.get("id"), t.get("name")))
+
+    @staticmethod
+    def report_active_clients():
+
+        tenants = tenant._get_all()
+
+        # Date/time boundaries
+        end = config.end or int(time.time())
+        start = config.start or (end - (30 * 24 * 60 * 60))
+
+        # CSV Headers
+        cli.write_header('# Command: {0}'.format(cli.current_command()))
+        cli.write_header(f'# Report start: {start}')
+        cli.write_header(f'# Report end: {end}')
+        cli.write_header("# config_id, tenant_name, active_client_count")
+
+        for t in tenants:
+            cli.write_columns((t.get('id'),  t.get('name'), report.active_clients(start, end, t.get('id'))))
+
+
 def log_level():
     if config.debug:
         return logging.DEBUG
@@ -456,6 +537,13 @@ def main():
             ioc.timeseries(config.domain)
         elif config.ioc_action == "changes":
             ioc.changes(config.domain)
+    elif config.command == "tenant":
+        if config.operation == "list":
+            tenant.list()
+        elif config.operation == "clients":
+            tenant.report_active_clients()
+        else:
+            print("Not supported")
 
 if __name__ == '__main__':
     main()
