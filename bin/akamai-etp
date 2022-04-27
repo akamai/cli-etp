@@ -36,7 +36,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.3.7"
+__version__ = "0.3.8"
 
 #: Window span in ad-hoc mode, default is 15 min
 span_duration_min = 15
@@ -395,7 +395,7 @@ class tenant:
     @staticmethod
     def _get_all():
         path = '/etp-config/v3/configs/{configId}/tenants'.format(configId = config.etp_config_id)
-        resp = session.get(urljoin(baseurl, path))
+        resp = session.get(urljoin(baseurl, path), params=build_params())
         if resp.status_code != 200:
             sys.stderr.write(f"Error fetching tenants:\n{resp.text}\n")
             sys.exit(2)
