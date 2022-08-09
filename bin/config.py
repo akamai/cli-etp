@@ -40,12 +40,12 @@ class EdgeGridConfig():
         subparsers = parser.add_subparsers(dest="command", help='ETP object to manipulate')
 
         # Security Events
-        event_parser = subparsers.add_parser("event", help="Fetch last events (from 1h15 ago to 1 hour ago)",
+        event_parser = subparsers.add_parser("event", help="Fetch last events (from 30 min ago to 3 min ago)",
                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         event_parser.add_argument('event_type', nargs='?', default="threat", 
                                   choices=['threat', 'aup', 'dns', 'proxy'], help="Event type, Threat, Acceptable User Policy (AUP), DNS or Proxy")
-        event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 1h15 ago")
-        event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is start + 15 minutes")
+        event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 30 min ago")
+        event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is now - 3 min")
         event_parser.add_argument('--output', '-o', help="Output file, default is stdout. Encoding is utf-8.")
         event_parser.add_argument('--tail', '-f', action='store_true', default=False, 
                                   help="""Do not stop when most recent log is reached,\n"""
@@ -53,8 +53,8 @@ class EdgeGridConfig():
                                        """to the input. --start and --end are ignored when used.""")
         event_parser.add_argument('--poll', type=int, default=60,
                                   help="How often we pull data in tail mode")
-        event_parser.add_argument('--limit', type=int, default=3*60*60,
-                                  help="Stop the most recent fetch to now minus specified seconds, default is 3 hours. Applicable to --tail")
+        event_parser.add_argument('--limit', type=int, default=3*60,
+                                  help="Stop the most recent fetch to now minus specified seconds, default is 3 min. Applicable to --tail")
 
         # ETP Lists
         list_parser = subparsers.add_parser("list", help="Manage ETP security list",

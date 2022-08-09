@@ -1,11 +1,14 @@
-# Akamai CLI: Enterprise Threat Protector<!-- omit in toc -->
+# Akamai CLI: Secure Internet Access Enterprise<!-- omit in toc -->
+
+SIA Enterprise was formerly known as Enterprise Threat Protector (ETP).
 
 ## Table of contents<!-- omit in toc -->
 
 - [Introduction](#introduction)
 - [Prerequisites](#prerequisites)
   - [Akamai CLI](#akamai-cli)
-- [Install](#install)
+  - [Python 3](#python-3)
+- [Install cli-etp](#install-cli-etp)
   - [API User and configuration file](#api-user-and-configuration-file)
 - [Updating ETP CLI module](#updating-etp-cli-module)
 - [Using a proxy](#using-a-proxy)
@@ -18,25 +21,30 @@
 - [Reporting](#reporting)
   - [List of sub-tenants](#list-of-sub-tenants)
   - [Active ETP Client by sub-tenant](#active-etp-client-by-sub-tenant)
+- [Frequently Asked Questions](#frequently-asked-questions)
 - [Troubleshooting](#troubleshooting)
   - [ERROR: Exiting with code 404, reason: Code-130009](#error-exiting-with-code-404-reason-code-130009)
 
 ## Introduction
 
-Enterprise Threat Protector (ETP) comes with a full suite of APIs. 
-Yet you need to build scripts to be able to interact with the service.
+Secure Internet Access Enterprise (formerly ETP) comes with a full suite of APIs. 
+API requires to implement code to be able to interact with the service.
 
-That's where Akamai CLI toolkit greatly help, no longer script to wrote yourself, you can run very common operations directly from the command line.
+That's where Akamai CLI greatly help, no longer script to wrote yourself, you can run very common operations directly from the command line.
 
 ## Prerequisites
 
 ### Akamai CLI
 
-You'll need the CLI toolkit, available on many platform.
+You'll need the Akamai CLI, available on many platforms.
 
 Please visit the [Getting Started](https://developer.akamai.com/cli/docs/getting-started) guide on developer.akamai.com.
 
-## Install
+### Python 3
+
+The machine running Akamai CLI will require Python 3.6+, you can download it from https://python.org.
+
+## Install cli-etp
 
 Installation is done via `akamai install`:
 
@@ -44,7 +52,7 @@ Installation is done via `akamai install`:
 $ akamai install etp
 ```
 
-Running this will run the system `python setup.py` automatically. 
+Running this will take care of all the dependencies.
 
 ### API User and configuration file
 
@@ -95,11 +103,10 @@ $ REQUESTS_CA_BUNDLE=~/ssl-proxying-certificate.pem akamai etp --proxy 127.0.0.1
 ### Fetch events
 
 Fetch the latest security events with the `event` command.
+The events delivery pipeline is almost realtime, in order to not miss any event, we recommend to query events from 3 minutes ago or older.
 
-![start and end definition](docs/receiving-data.png "start and end definition")
-
-If `--start` is not specified, we set it to 45 minutes ago  
-If `--end` is not specified, we set it to 30 minutes ago
+If `--start` is not specified, we set it to 30 minutes ago
+If `--end` is not specified, we set it to 3 minutes ago
 
 Both argument expect a EPOCH timestamp.
 
@@ -239,6 +246,14 @@ $ akamai etp tenant clients
 45678,Tenant D,40
 56789,Tenant E,50
 ```
+
+## Frequently Asked Questions
+
+<em>Q: Can I use cli-etp to stream data to my SIEM?</em>  
+A: Yes, you can use the file output and have the file monitor by a SIEM agent. Alternatively check out [Akamai Universal Log Streamer (ULS)](https://github.com/akamai/uls) which offer TCP, UDP, HTTP and File output with a lot of flexibility!
+
+<em>Will there be a cli-sia?</em>  
+A: Maybe. We keep maintaining `cli-etp` and the project might be renamed to `cli-sia` at some point.
 
 ## Troubleshooting
 

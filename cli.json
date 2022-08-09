@@ -5,8 +5,8 @@
   "commands": [
     {
       "name": "etp",
-      "version": "0.3.7",
-      "description": "Akamai CLI for Enterprise Threat Protector"
+      "version": "0.3.8",
+      "description": "Akamai CLI for Secure Internet Access Enterprise (f.k.a. Enterprise Threat Protector)"
     }
   ]
 }
