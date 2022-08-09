@@ -1,6 +1,7 @@
 # Akamai CLI: Secure Internet Access Enterprise<!-- omit in toc -->
 
-SIA Enterprise was formerly known as Enterprise Threat Protector (ETP).
+SIA Enterprise was formerly known as Enterprise Threat Protector (ETP).  
+More information at https://www.akamai.com/sia
 
 ## Table of contents<!-- omit in toc -->
 
