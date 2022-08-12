@@ -58,17 +58,19 @@ Running this will take care of all the dependencies.
 ### API User and configuration file
 
 On [Akamai Control Center](https://control.akamai.com), make sure you create an API user 
-with the _ETP Configuration API_ (`/etp-config`) with read-write permission.
+with the _ETP Configuration API_ (`/etp-config`) with `READ-WRITE` permission.
 
 Upon user credential creation, you'll get a `.edgerc` file with 4 parameters.
 You'll need to add a 5th line with the `etp_config_id`. 
 
 The value of the parameter is a integer you can obtain by navigating in Akamai Control Center: 
 
-- Select Enterprise Threat Protector from the left menu
-- Select Utilities 
-- Select ETP Client tab 
-- Locate _customer identifier_ on the right
+- Select **Enterprise Center** from the left menu
+- Navigate to **Threat Protection**
+- Open **Locations** > **Locations**
+- Extract the ETP Config ID integer from the URL as pictured:
+
+<img src="docs/etp-config-id.png" width="100%">
 
 Example of `.edgerc` file:
 ```

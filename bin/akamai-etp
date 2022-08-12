@@ -395,7 +395,7 @@ class tenant:
     @staticmethod
     def _get_all():
         path = '/etp-config/v3/configs/{configId}/tenants'.format(configId = config.etp_config_id)
-        resp = session.get(urljoin(baseurl, path))
+        resp = session.get(urljoin(baseurl, path), params=build_params())
         if resp.status_code != 200:
             sys.stderr.write(f"Error fetching tenants:\n{resp.text}\n")
             sys.exit(2)
