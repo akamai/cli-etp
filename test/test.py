@@ -17,7 +17,7 @@ This module replaces the old test.bash script
 Tested with nose2:
 ```bash
 cd test
-nose2 --html-report -v
+nose2
 open report.html
 ```
 """
@@ -45,6 +45,8 @@ class CliETPTest(unittest.TestCase):
 
     def cli_command(self, *args):
         command = shlex.split(f'python3 {self.maindir}/bin/akamai-etp')
+        if os.environ['EDGERC_SECTION']:
+            command.extend(["--section", os.environ['EDGERC_SECTION']])
         command.extend(*args)
         print("\nCOMMAND: ", command)
         return command
@@ -117,7 +119,6 @@ class TestEvents(CliETPTest):
         finally:
             if os.path.isfile(output_filename):
                 os.remove(output_filename)
-
 
 
 class TestCliETP(CliETPTest):

@@ -28,6 +28,7 @@ from enum import Enum
 import logging
 from urllib.parse import parse_qs
 import csv
+import math
 
 # 3rd party modules
 
@@ -93,20 +94,12 @@ def exit_fromresponse(response):
         exit(response.status_code)
 
 
-def force_unicode(s):
-    if sys.version_info.major == 2:
-        return unicode(s)
-    else:
-        return s
-
-
 def type_hostorip(hostorip):
     """
     Detect if a string is an actual IP address (IPv4 or IPv6) or an hostname
     """
-    if ((sys.version_info.major == 2 and not isinstance(hostorip, unicode)) or
-        (sys.version_info.major > 2 and not isinstance(hostorip, str))):
-        raise ValueError('hostorip must be a unicode string, %s provided' % 
+    if not isinstance(hostorip, str):
+        raise ValueError('hostorip must be a unicode string, %s provided' %
                          type(hostorip).__name__)
     try:
         ipaddress.ip_address(hostorip)
@@ -121,13 +114,13 @@ def iphost_argument_tolist(config):
             filename = item[1:]
             if filename == "-":
                 for line in sys.stdin:
-                    yield force_unicode(line.strip())
+                    yield line.strip()
             else:
                 with open(filename, "r") as f:
                     for line in f:
-                        yield force_unicode(line.strip())
+                        yield line.strip()
         else:
-            yield force_unicode(item)
+            yield item
 
 
 def build_params(params=None):
@@ -158,7 +151,7 @@ class cli:
     @staticmethod
     def write(s):
         print(s)
-    
+
     @staticmethod
     def write_header(s):
         sys.stderr.write(s)
@@ -176,7 +169,7 @@ class cli:
     @staticmethod
     def current_command():
         return "akamai etp " + " ".join(sys.argv[1:])
-    
+
 
 def input2feed(event_type):
     api_eventtype = None
@@ -191,6 +184,7 @@ def input2feed(event_type):
     if api_eventtype is None:
         raise ValueError(f'event_type provided is support supported: {event_type}')
     return api_eventtype
+
 
 def fetch_events(config, output):
     """
@@ -240,7 +234,8 @@ def fetch_events(config, output):
                     }
                 LOG.info("{OPEN} API URL: %s" % event_url)
                 LOG.info("{OPEN} API POST param %s" % post_data)
-                r = session.post(event_url, params=build_params(), json=post_data, headers=headers, timeout=min(300, poll_interval_sec*2))
+                r = session.post(event_url, params=build_params(),
+                                 json=post_data, headers=headers, timeout=min(300, poll_interval_sec*2))
                 byte_count += len(r.content)
                 LOG.info("{OPEN} API response code is HTTP/%s, body %s bytes" % (r.status_code, len(r.content)))
                 if r.status_code != 200:
@@ -262,7 +257,8 @@ def fetch_events(config, output):
                     event_interval_count += 1
                 output.flush()
                 pageNumber += 1
-                LOG.info(f"{event_interval_count} event(s) for current {poll_interval_sec}s interval [{start} -> {end}], {pageNumber - 1} page(s).")
+                LOG.info(f"{event_interval_count} event(s) for current {poll_interval_sec}s "
+                         f"interval [{start} -> {end}], {pageNumber - 1} page(s).")
             if not config.tail:
                 break
             else:
@@ -279,8 +275,8 @@ def fetch_events(config, output):
                     # start = int(time.time()) - fetch_limit - poll_interval_sec
                     # end = start + poll_interval_sec
                     # after 0.3.5
-                    start = end # next cycle resume where we finish this one
-                    end = int(time.time()) - fetch_limit # the window ends at now - limit
+                    start = end  # next cycle resume where we finish this one
+                    end = int(time.time()) - fetch_limit  # the window ends at now - limit
                     LOG.info(f"Next cycle will be from {start} to {end} [{end - start}s]...")
     except KeyboardInterrupt:
         stop_event.set()
@@ -379,12 +375,13 @@ class report:
 
     @staticmethod
     def active_clients(start, end, configId=None):
-        path = '/etp-config/v3/configs/{configId}/client/status'.format(configId = configId or config.etp_config_id)
+        path = '/etp-config/v3/configs/{configId}/client/status'.format(
+            configId=configId or config.etp_config_id)
         params = {'startTimeSec': start, 'endTimeSec': end}
         resp = session.get(urljoin(baseurl, path), params=build_params(params))
         grand_total = 0
-        for os in resp.json().get('installed', []):
-            grand_total += os.get('total', 0)
+        for operating_system in resp.json().get('installed', []):
+            grand_total += operating_system.get('total', 0)
         return grand_total
 
 
@@ -394,7 +391,8 @@ class tenant:
     """
     @staticmethod
     def _get_all():
-        path = '/etp-config/v3/configs/{configId}/tenants'.format(configId = config.etp_config_id)
+        path = '/etp-config/v3/configs/{configId}/tenants'.format(
+            configId=config.etp_config_id)
         resp = session.get(urljoin(baseurl, path), params=build_params())
         if resp.status_code != 200:
             sys.stderr.write(f"Error fetching tenants:\n{resp.text}\n")
@@ -436,6 +434,7 @@ def log_level():
     else:
         return logging.ERROR
 
+
 def prepare_session(config):
     """
     Prepare a Session object to issue request against Akamai {OPEN} API
@@ -458,6 +457,7 @@ def prepare_session(config):
     s.headers.update({'User-Agent': f"{config.ua_prefix} cli-etp/{__version__}"})
 
     return s
+
 
 def main():
 
@@ -510,18 +510,27 @@ def main():
             exit_fromresponse(r)
         elif config.list_action == "get":
             if config.listid:
-                url = urljoin(baseurl, "/etp-config/v1/configs/{configId}/lists/{listId}/items".format(
+                # https://techdocs.akamai.com/etp-config/reference/get-list
+                url = urljoin(baseurl, "/etp-config/v3/configs/{configId}/lists/{listId}/items".format(
                     configId=config.etp_config_id,
                     listId=config.listid
                 ))
-                r = session.get(url, params=build_params(), headers=headers)
-                if r.status_code == 200:
-                    for dom in r.json().get("items", []):
-                        print(dom.get('value'))
+                page_number = 0
+                page_size = 50
+                total_page = None
+                while total_page is None or page_number < total_page:
+                    r = session.get(url, params=build_params({'page': page_number, 'numItemsPerPage': page_size}),
+                                    headers=headers)
+                    if r.status_code == 200:
+                        data = r.json()
+                        page_number += 1
+                        total_page = math.ceil(data.get('totalCount') / page_size)
+                        for dom in r.json().get("items", []):
+                            cli.write(dom.get('value'))
                 exit_fromresponse(r)
             else:
                 url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
-                r = session.get(url, params=build_params(), headers=headers)
+                r = session.get(url, params=build_params(page=page_number), headers=headers)
                 if r.status_code == 200:
                     for list_item in r.json():
                         print("%s,%s" % (list_item.get("id"), list_item.get('name')))
@@ -544,6 +553,7 @@ def main():
             tenant.report_active_clients()
         else:
             print("Not supported")
+
 
 if __name__ == '__main__':
     main()
