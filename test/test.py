@@ -15,9 +15,15 @@
 """
 This module replaces the old test.bash script
 Tested with nose2:
+
 ```bash
+
+# Optional
+EDGERC_SECTION=mysection
+# End Optional
+
 cd test
-nose2
+nose2 -v
 open report.html
 ```
 """
@@ -45,10 +51,10 @@ class CliETPTest(unittest.TestCase):
 
     def cli_command(self, *args):
         command = shlex.split(f'python3 {self.maindir}/bin/akamai-etp')
-        if os.environ['EDGERC_SECTION']:
+        if os.environ.get('EDGERC_SECTION'):
             command.extend(["--section", os.environ['EDGERC_SECTION']])
         command.extend(*args)
-        print("\nCOMMAND: ", command)
+        print("\nCOMMAND: ", " ".join(command))
         return command
 
     def cli_run(self, *args):
@@ -140,6 +146,35 @@ class TestCliETP(CliETPTest):
         cmd = self.cli_run('version')
         stdout, stderr = cmd.communicate()
         self.assertRegex(stdout.decode(encoding), r'[0-9]+\.[0-9]+\.[0-9]+\n', 'Version should be x.y.z')
+        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+
+
+class TestListETP(CliETPTest):
+    """
+    TODO: add a create and remove list once implemented in the cli
+    """
+    def test_add100_list(self):
+        test_fqdns = list("testhost-{}.cli-etp.unittest".format(i) for i in range(100))
+        cmd = self.cli_run('list', 'add', '37591', *test_fqdns)
+        stdout, stderr = cmd.communicate()
+        if cmd.returncode != 0:
+            print(stdout, stderr)
+        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+        cmd = self.cli_run('list', 'remove', '37591', *test_fqdns)
+        cmd.communicate()
+    
+        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+
+    def test_get_lists(self):
+        """
+        Get the security lists configured in the tenant
+        """
+        cmd = self.cli_run('list', 'get')
+        stdout, stderr = cmd.communicate()
+        output = stdout.decode(encoding)
+        line_count = len(output.splitlines())
+        print(line_count)
+        self.assertGreater(line_count, 0, "We expect at least one list to be on this tenant/config_id")
         self.assertEqual(cmd.returncode, 0, 'return code must be 0')
 
 

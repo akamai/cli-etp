@@ -530,7 +530,7 @@ def main():
                 exit_fromresponse(r)
             else:
                 url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists" % (config.etp_config_id))
-                r = session.get(url, params=build_params(page=page_number), headers=headers)
+                r = session.get(url, params=build_params(), headers=headers)
                 if r.status_code == 200:
                     for list_item in r.json():
                         print("%s,%s" % (list_item.get("id"), list_item.get('name')))
