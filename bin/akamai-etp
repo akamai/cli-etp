@@ -45,7 +45,7 @@ span_duration_min = 3
 session = None
 verbose = False
 section_name = "default"
-headers = {'content-type': "application/json", 'charset': "utf-8"}
+headers = {'accept': "application/json"}
 extra_qs = None
 
 LOG = logging.getLogger(__name__)
