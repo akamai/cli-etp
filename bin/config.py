@@ -43,7 +43,8 @@ class EdgeGridConfig():
         event_parser = subparsers.add_parser("event", help="Fetch last events (from 30 min ago to 3 min ago)",
                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         event_parser.add_argument('event_type', nargs='?', default="threat", 
-                                  choices=['threat', 'aup', 'dns', 'proxy'], help="Event type, Threat, Acceptable User Policy (AUP), DNS or Proxy")
+                                  choices=['threat', 'aup', 'dns', 'proxy'], help="Event type, Threat, Acceptable User "
+                                                                                  "Policy (AUP), DNS or Proxy")
         event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 30 min ago")
         event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is now - 3 min")
         event_parser.add_argument('--output', '-o', help="Output file, default is stdout. Encoding is utf-8.")
@@ -52,9 +53,12 @@ class EdgeGridConfig():
                                        """rather to wait for additional data to be appended\n"""
                                        """to the input. --start and --end are ignored when used.""")
         event_parser.add_argument('--poll', type=int, default=60,
-                                  help="How often we pull data in tail mode")
+                                  help="Poll frequency in seconds with --tail mode. Default is 60s")
         event_parser.add_argument('--limit', type=int, default=3*60,
-                                  help="Stop the most recent fetch to now minus specified seconds, default is 3 min. Applicable to --tail")
+                                  help="Stop the most recent fetch to now minus specified seconds, default is 3 min. "
+                                       "Applicable to --tail")
+        event_parser.add_argument('--concurrent', type=int, default=1,
+                                  help="Number of concurrent API call")
 
         # ETP Lists
         list_parser = subparsers.add_parser("list", help="Manage ETP security list",

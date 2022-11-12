@@ -1,3 +1,4 @@
 requests
 ipaddress
 edgegrid-python
+urllib3>=1.26
