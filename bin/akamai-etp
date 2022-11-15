@@ -48,7 +48,7 @@ span_duration_min = 3
 session = None
 verbose = False
 section_name = "default"
-headers = {'accept': "application/json"}
+headers = {'Accept': "application/json"}
 extra_qs = None
 
 LOG = logging.getLogger("cli-etp")
@@ -81,6 +81,13 @@ class ETPListType(Enum):
 class ETPConfidence(Enum):
     SUSPECTED = 1
     KNOWN = 2
+
+
+class ETPListCategory(Enum):
+    MALWARE = 1
+    PHISHING = 2
+    CNC = 3
+    OTHER = 4
 
 
 class ETPEventFetchStats(object):
@@ -132,7 +139,9 @@ def exit_fromresponse(response):
             reason = response.json().get("detail")
         except ValueError:
             pass
-        sys.stderr.write("ERROR: Exiting with code %s, reason: %s\n" % (response.status_code, reason))
+        sys.stderr.write("ERROR: Exiting with code %s, reason: %s, use -d or -v for more details.\n" % (response.status_code, reason))
+        if response.status_code == 401:
+            LOG.error(f"ERROR: Client Token was: {config.client_token} in [{config.section}]")
         exit(response.status_code)
 
 
@@ -308,11 +317,9 @@ def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, 
 
 def fetch_events_concurrent(config, output):
     """
-    Alternative to fetch_events leveraging thread to fetch pages concurrently
-    EXPERIMENTAL: 
-    - some features not supported
-    - e.g. --tail
-    - e.g. interupt/abort handling
+    Fetch ETP security events
+    Unlike the old fetch_events (prior to cli-etp 0.4.1) this version is optimized
+    to fetch the pages with concurrency leveraging a pool of thread.
     """
     stats = ETPEventFetchStats()
 
@@ -373,102 +380,46 @@ def fetch_events_concurrent(config, output):
                      f"{stats.api_calls} API calls")
 
 
-def fetch_events(config, output):
+def list_create(config):
     """
-    Fetch all events
+    Create a new custom security list
+    API ref: https://techdocs.akamai.com/etp-config/reference/post-list
     """
-    event_count = 0
-    byte_count = 0
-
-    if config.tail:  # The window span is show so we can keep adding content by small increment
-        start = int(time.time()) - fetch_limit - poll_interval_sec
-        end = start + poll_interval_sec
-        signal.signal(signal.SIGTERM, exit_gracefully)
-        signal.signal(signal.SIGINT, exit_gracefully)
-    else:  # Larger window span
-        start = int(time.time()) - fetch_limit - (span_duration_min * 60)
-        if config.start:
-            start = config.start
-        end = start + (span_duration_min * 60)
-        if config.end:
-            end = config.end
-    try:
-        while not stop_event.is_set():
-            pageNumber = 1
-            numOfPages = 0
-            event_interval_count = 0
-            while numOfPages == 0 or pageNumber <= numOfPages:
-                post_data = {
-                    'startTimeSec': start,
-                    'endTimeSec': end,
-                    'orderBy': "DESC",
-                    'pageNumber': pageNumber,
-                    'pageSize': EVENT_PAGE_SIZE,
-                    'filters': {}
-                }
-
-                timing_s = time.time()  # The fetch operation can take a while
-                event_url = '%(baseurl)s/etp-report/v3/configs/%(config_id)s/%(event_type)s/details' % \
-                    {
-                        'baseurl': baseurl,
-                        'config_id': config.etp_config_id,
-                        'event_type': input2feed(config.event_type)
-                    }
-                LOG.info("{OPEN} API URL: %s" % event_url)
-                LOG.info("{OPEN} API POST param %s" % post_data)
-                r = session.post(event_url, params=build_params(),
-                                 json=post_data, headers=headers, timeout=min(300, poll_interval_sec*2))
-                byte_count += len(r.content)
-                LOG.info("{OPEN} API response code is HTTP/%s, body %s bytes" % (r.status_code, len(r.content)))
-                if r.status_code != 200:
-                    LOG.error(r.content)
-                    break
-                LOG.info("{OPEN} API call took %.2f seconds" % (time.time() - timing_s))
-                response_data = r.json()
-
-                # Determine maximum page size based on the totalRecords of the first requests reply
-                if numOfPages == 0:
-                    LOG.info("Page info: %s" % response_data.get("pageInfo", {}))
-                    total_records = response_data["pageInfo"]["totalRecords"]
-                    numOfPages = int((total_records / EVENT_PAGE_SIZE) + 1)
-                    LOG.info("Calculated number of pages: %s (based on %s)" % (numOfPages, total_records))
-
-                for e in response_data.get('dataRows', []):
-                    output.write("%s\n" % json.dumps(e))
-                    event_count += 1
-                    event_interval_count += 1
-                output.flush()
-                pageNumber += 1
-                LOG.info(f"{event_interval_count} event(s) for current {poll_interval_sec}s "
-                         f"interval [{start} -> {end}], {pageNumber - 1} page(s).")
-            if not config.tail:
-                break
-            else:
-                LOG.info("%d event(s) fetched so far" % event_count)
-                # Here we assume the fetch should take less than poll_interval_sec
-                # otherwise we may have datagaps
-                # TODO: add a better/more resilient logic
-                sleep_time = max(0, poll_interval_sec - (time.time() - timing_s))
-                if sleep_time == 0:
-                    LOG.warning(f"Drifting, consider increase the poll interval (currently {poll_interval_sec}s)")
-                if not stop_event.wait(sleep_time):
-                    LOG.info("Sleeping for %.2f sec..." % sleep_time)
-                    start = end  # next cycle resume where we finish this one
-                    end = int(time.time()) - fetch_limit  # the window ends at now - limit
-                    LOG.info(f"Next cycle will be from {start} to {end} [{end - start}s]...")
-    except KeyboardInterrupt:
-        stop_event.set()
-        LOG.warning("Keyboard interrupt detected")
-    except requests.exceptions.ReadTimeout:
-        LOG.warning(f"Request timeout, consider increase poll interval (currently {poll_interval_sec}s)")
-    finally:
-        LOG.info(f"{event_count} event(s) fetched in total, {byte_count} byte(s)")
+    payload = {
+        "name": config.name,
+        "description": config.description,
+        "securityCategoryId": config.category
+    }
+    create_list_api = urljoin(baseurl, f"/etp-config/v3/configs/{config.etp_config_id}/lists")
+    r = session.post(create_list_api, params=build_params(), json=payload)
+    newlisturl = r.headers.get('Location')
+    if r.status_code == 200 and newlisturl:
+        cli.write("Security list {} created.".format(newlisturl[newlisturl.rfind('/')+1:]))
+    exit_fromresponse(r)
 
 
-def list_add_or_delete(config):
+def list_delete(config):
+    """
+    Delete a custom security list
+    API ref: NOT DOCUMENTED as of 2022-11-14
+             Simply call the DELETE method with If-Match as documented here
+             https://techdocs.akamai.com/etp-config/reference/object-versioning
+    """
+    delete_list_api = urljoin(baseurl, f"/etp-config/v3/configs/{config.etp_config_id}/lists/{config.listid}")
+    read = session.get(delete_list_api, params=build_params(), headers=headers)
+    etag = read.headers.get('ETag')
+    delete_headers = headers.copy()
+    delete_headers['If-Match'] = etag
+    r = session.delete(delete_list_api, params=build_params(), headers=delete_headers)
+    if r.status_code == 200:
+        cli.write(f"Security List {config.listid} deleted.")
+    exit_fromresponse(r)
+
+
+def list_add_or_delete_item(config):
     # Maps security command line argument with dict key
     action_key = "add"
-    if config.list_action == "remove":
+    if config.list_action == "remove_item":
         action_key = "delete"
     confidence = ETPConfidence.KNOWN
     if action_key == "add" and config.suspect:
@@ -499,7 +450,7 @@ def list_add_or_delete(config):
         print("== payload ===")
         print(json.dumps(change))
 
-    r = session.patch(add_item_url,  params=build_params(), data=json.dumps(change), headers=headers)
+    r = session.patch(add_item_url,  params=build_params(), json=change, headers=headers)
     exit_fromresponse(r)
 
 
@@ -685,18 +636,19 @@ def main():
             LOG.info("Output file: %s" % config.output)
             out = open(config.output, 'w+')
         try:
-            if config.concurrent == 1:  # Standard before cli-etp 0.4.1
-                fetch_events(config, out)
-            else: # Introduced in cli-etp 0.4.1
-                fetch_events_concurrent(config, out)
+            fetch_events_concurrent(config, out)
         finally:
             if out is not None and out != sys.stdout:
                 LOG.info("Closing output file %s..." % config.output)
                 out.close()
 
     elif config.command == "list":
-        if config.list_action in ("add", "remove"):
-            list_add_or_delete(config)
+        if config.list_action == "create":
+            list_create(config)
+        elif config.list_action == "delete":
+            list_delete(config)
+        elif config.list_action in ("add_item", "remove_item"):
+            list_add_or_delete_item(config)
         elif config.list_action == "deploy":
             url = urljoin(baseurl, "/etp-config/v1/configs/%s/lists/deployments" % config.etp_config_id)
             payload = {

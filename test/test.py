@@ -1,4 +1,4 @@
-# Copyright 2021 Akamai Technologies, Inc. All Rights Reserved
+# Copyright 2022 Akamai Technologies, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,18 +36,22 @@ from pathlib import Path
 import collections
 import tempfile
 import os
+import random
+import re
 
 # Global variables
 encoding = 'utf-8'
 
 
 class CliETPTest(unittest.TestCase):
+    seed = 0
     testdir = None
     maindir = None
 
     def setUp(self):
         self.testdir = Path(__file__).resolve().parent
         self.maindir = Path(__file__).resolve().parent.parent
+        self.seed = random.randint(10000, 99999)
 
     def cli_command(self, *args):
         command = shlex.split(f'python3 {self.maindir}/bin/akamai-etp')
@@ -71,7 +75,7 @@ class CliETPTest(unittest.TestCase):
     def duplicate_count(filename):
         total_count = 0
         with open(filename) as infile:
-            counts = collections.Counter(l.strip() for l in infile)
+            counts = collections.Counter(line.strip() for line in infile)
         for line, count in counts.most_common():
             if count > 1:
                 print(f"DUPLICATE[{count}] {line}")
@@ -150,20 +154,53 @@ class TestCliETP(CliETPTest):
 
 
 class TestListETP(CliETPTest):
+
+    listid = None
+
+    """
+    Create a list
+    """
+    def setUp(self):
+        super().setUp()
+        cmd = self.cli_run('list', 'create', f'clietp_list_{self.seed}', "Created by test/test.py", 4)
+        stdout, stderr = cmd.communicate()
+        if cmd.returncode != 0:
+            print(stdout, stderr)
+
+        self.listid = stdout
+        regex = r" (\d+) "
+        matches = re.findall(regex, stdout.decode())
+        self.assertEqual(len(matches), 1, 'A list ID must be displayed after the command akamai etp list create ...')
+        self.listid = int(matches[0])
+        print("ListID=", self.listid)
+        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+
+    def tearDown(self):
+        if self.listid:
+            cmd = self.cli_run('list', 'delete', self.listid)
+            stdout, stderr = cmd.communicate()
+            if cmd.returncode != 0:
+                print("ERROR cli_run:", stdout, stderr)
+            self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+
     """
     TODO: add a create and remove list once implemented in the cli
     """
     def test_add100_list(self):
-        test_fqdns = list("testhost-{}.cli-etp.unittest".format(i) for i in range(100))
-        cmd = self.cli_run('list', 'add', '37591', *test_fqdns)
+
+        test_fqdns = list("testhost-{}-{}.cli-etp.unittest".format(i, self.seed) for i in range(100))
+
+        cmd = self.cli_run('list', 'add_item', self.listid, *test_fqdns)
         stdout, stderr = cmd.communicate()
         if cmd.returncode != 0:
             print(stdout, stderr)
-        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
-        cmd = self.cli_run('list', 'remove', '37591', *test_fqdns)
-        cmd.communicate()
-    
-        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+        self.assertEqual(cmd.returncode, 0, 'add 100 items sub-operation: return code must be 0')
+
+        cmd = self.cli_run('list', 'remove_item', self.listid, *test_fqdns)
+        stdout, stderr = cmd.communicate()
+        if cmd.returncode != 0:
+            print("ERROR with the command ", cmd.args, stdout, stderr)
+        self.assertEqual(cmd.returncode, 0, 'remove 100 items sub-operation: return code must be 0')
 
     def test_get_lists(self):
         """

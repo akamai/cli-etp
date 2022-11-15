@@ -22,7 +22,9 @@ import logging
 from configparser import ConfigParser
 import http.client as http_client
 
-
+# 2022, new name for ETP is SIA
+product_name = "Secure Internet Access Enterprise"
+product_acronym = "SIA"
 epilog = '''Copyright (C) Akamai Technologies, Inc\n''' \
          '''Visit http://github.com/akamai/cli-etp for detailed documentation'''
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ logger = logging.getLogger(__name__)
 class EdgeGridConfig():
 
     parser = argparse.ArgumentParser(prog="akamai etp",
-                                     description='Interact with ETP configuration and logs/events', 
+                                     description='Interact with ETP configuration and logs/events',
                                      epilog=epilog,
                                      formatter_class=argparse.RawTextHelpFormatter)
 
@@ -42,13 +44,13 @@ class EdgeGridConfig():
         # Security Events
         event_parser = subparsers.add_parser("event", help="Fetch last events (from 30 min ago to 3 min ago)",
                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
-        event_parser.add_argument('event_type', nargs='?', default="threat", 
+        event_parser.add_argument('event_type', nargs='?', default="threat",
                                   choices=['threat', 'aup', 'dns', 'proxy'], help="Event type, Threat, Acceptable User "
                                                                                   "Policy (AUP), DNS or Proxy")
         event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 30 min ago")
         event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is now - 3 min")
         event_parser.add_argument('--output', '-o', help="Output file, default is stdout. Encoding is utf-8.")
-        event_parser.add_argument('--tail', '-f', action='store_true', default=False, 
+        event_parser.add_argument('--tail', '-f', action='store_true', default=False,
                                   help="""Do not stop when most recent log is reached,\n"""
                                        """rather to wait for additional data to be appended\n"""
                                        """to the input. --start and --end are ignored when used.""")
@@ -57,7 +59,7 @@ class EdgeGridConfig():
         event_parser.add_argument('--limit', type=int, default=3*60,
                                   help="Stop the most recent fetch to now minus specified seconds, default is 3 min. "
                                        "Applicable to --tail")
-        event_parser.add_argument('--concurrent', type=int, default=1,
+        event_parser.add_argument('--concurrent', type=int, default=os.environ.get('CLIETP_FETCH_CONCURRENT', 1),
                                   help="Number of concurrent API call")
 
         # ETP Lists
@@ -65,17 +67,26 @@ class EdgeGridConfig():
                                             epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         subsub = list_parser.add_subparsers(dest="list_action", help='List action')
 
+        listcreate = subsub.add_parser("create", help="Create a new security list")
+        listcreate.add_argument('name', type=str, help='List name')
+        listcreate.add_argument('description', type=str, help='List description')
+        # TODO: offer choice based on ETPListCategory enum
+        listcreate.add_argument('category', type=int, default=4, help='List category ID')
+
+        listdelete = subsub.add_parser("delete", help="Delete a security list")
+        listdelete.add_argument('listid', type=int, help='List ID')
+
         listget = subsub.add_parser("get", help="List of ETP security lists")
         listget.add_argument('listid', type=int, nargs='?', metavar='listid', help='ETP list ID')
 
-        listadd = subsub.add_parser("add", help="Add one or multiple IP or host to a list",
+        listadd = subsub.add_parser("add_item", help="Add one or multiple IP or host to a list",
                                     epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listadd.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
         listadd.add_argument('iporhost', metavar='IP/host', nargs='+', help='IP or FQDN to add/remove to the list')
-        listadd.add_argument('--suspect', dest='suspect', default=False, action="store_true", 
+        listadd.add_argument('--suspect', dest='suspect', default=False, action="store_true",
                              help='Item will be added as suspect confidence instead of known')
 
-        listremove = subsub.add_parser("remove", help="Remove one or multiple IP or host from a list", 
+        listremove = subsub.add_parser("remove_item", help="Remove one or multiple IP or host from a list",
                                        epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         listremove.add_argument('listid', type=int, metavar='listid', help='ETP list ID')
         listremove.add_argument('iporhost', metavar='IP/host', nargs='+', help='IP or FQDN to add/remove to the list')
@@ -99,26 +110,28 @@ class EdgeGridConfig():
         tenant_parser = subparsers.add_parser("tenant", help="Manage ETP Account sub-tenants",
                                               epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         tenant_operation = tenant_parser.add_subparsers(dest="operation", help='Sub-tenant operation')
-        tenant_list = tenant_operation.add_parser("list", help="List all tenants in the account",
-                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
-        tenant_reportclient = tenant_operation.add_parser("clients", help="Active ETP Client for the last 30 days per tenant",
-                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+        tenant_operation.add_parser(
+            "list", help="List all tenants in the account",
+            epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+        tenant_reportclient = tenant_operation.add_parser(
+            "clients", help="Active ETP Client for the last 30 days per tenant",
+            epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         tenant_reportclient.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 1h ago")
         tenant_reportclient.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is now")
 
         # General options
-        subparsers.add_parser("version", help="Display CLI ETP module version", 
+        subparsers.add_parser("version", help="Display CLI ETP module version",
                               epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
 
         parser.add_argument('--verbose', '-v', default=False, action='count', help=' Verbose mode')
         parser.add_argument('--debug', '-d', default=False, action='count', help=' Debug mode (prints HTTP headers)')
         parser.add_argument('--logfile', '-l', default=None, help='Log file, stdout if not set')
 
-        parser.add_argument('--edgerc', '-e', default='~/.edgerc', metavar='credentials_file', 
+        parser.add_argument('--edgerc', '-e', default='~/.edgerc', metavar='credentials_file',
                             help=' Location of the credentials file (default is ~/.edgerc)')
         parser.add_argument('--proxy', '-p', default='', help=''' HTTP/S Proxy Host/IP and port number,'''
                                                               ''' do not use prefix (e.g. 10.0.0.1:8888)''')
-        parser.add_argument('--section', '-c', default='default', metavar='credentials_file_section', action='store', 
+        parser.add_argument('--section', '-c', default='default', metavar='credentials_file_section', action='store',
                             help=' Credentials file Section\'s name to use')
         parser.add_argument('--user-agent-prefix', dest='ua_prefix', default='Akamai-CLI', help=argparse.SUPPRESS)
 
@@ -180,4 +193,3 @@ class EdgeGridConfig():
     def create_base_url(self):
         if hasattr(self, 'host'):
             self.base_url = "https://%s" % self.host
-    
