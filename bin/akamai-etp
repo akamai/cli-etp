@@ -285,7 +285,7 @@ def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, 
                  f"bytes, page #{page_number}")
         if r.status_code != 200:
             stats.api_calls_fail += 1
-            LOG.error(r.content)
+            LOG.error(f"API call failed with HTTP/{r.status_code}: {r.content}")
 
         stats.inc_poll_elapsed(r.elapsed)
         LOG.info("{OPEN} API call took %.2f seconds, page #%s" % (r.elapsed.total_seconds(), page_number))
@@ -313,6 +313,28 @@ def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, 
 
     except requests.exceptions.ReadTimeout:
         LOG.warning("Request timeout")
+
+
+def events_summary(start, end, config):
+    """
+    Fetch the summary of a particular timeframe of events.
+    API ref:
+        https://techdocs.akamai.com/etp-reporting/reference/get-dns-activities
+    """
+    api_url = '%(baseurl)s/etp-report/v3/configs/%(config_id)s/%(event_type)s/aggregate' % \
+        {
+            'baseurl': baseurl,
+            'config_id': config.etp_config_id,
+            'event_type': input2feed(config.event_type)
+        }
+    try:
+        LOG.info(api_url)
+        r = session.get(api_url, params=build_params({"startTimeSec": start, "endTimeSec": end}))
+        LOG.debug(f"Aggregate report: {r.text} events")
+        data = r.json()
+        return data.get("aggregations", [])[0].get("total")
+    except Exception:
+        LOG.exception("Error fetching summary...")
 
 
 def fetch_events_concurrent(config, output):
@@ -343,6 +365,7 @@ def fetch_events_concurrent(config, output):
 
     while not stop_event.is_set():
         timing_s = time.time()
+        expected_event_count = events_summary(start, end, config)
         # 1st page fetch is executed in the main cli thread, optional subsequent
         # ones are executed within the thread pool
         fetch_event_page(start, end, 1, concurrent_fetch, pool_futures, stats, output)
@@ -352,7 +375,9 @@ def fetch_events_concurrent(config, output):
             if not config.tail:
                 break
             else:
-                LOG.info(f"[tail] Fetched {stats.poll_events:,} event(s), {stats.poll_api_calls} API calls, "
+                LOG.info(f"[tail] Fetched {stats.poll_events:,} event(s), "
+                         f"{expected_event_count:,} expected, "
+                         f"{stats.poll_api_calls} API calls, "
                          f"{stats.poll_elapsed} elapsed for this cycle")
                 stats.inc_poll_cycle()  # Reset the per cycle counters
                 LOG.info(f"[tail] Fetched {stats.events:,} event(s), ran {stats.poll_cycles} cycle(s)")
@@ -375,7 +400,7 @@ def fetch_events_concurrent(config, output):
         except requests.exceptions.ReadTimeout:
             LOG.warning(f"Request timeout, consider increase poll interval (currently {poll_interval_sec}s)")
         finally:
-            LOG.info(f"{stats.events:,} event(s) fetched in total, "
+            LOG.info(f"{stats.events:,} event(s) fetched in total, {expected_event_count:,} expected, "
                      f"{stats.bytes:,} byte(s), "
                      f"{stats.api_calls} API calls")
 
