@@ -45,8 +45,10 @@ class EdgeGridConfig():
         event_parser = subparsers.add_parser("event", help="Fetch last events (from 30 min ago to 3 min ago)",
                                              epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
         event_parser.add_argument('event_type', nargs='?', default="threat",
-                                  choices=['threat', 'aup', 'dns', 'proxy'], help="Event type, Threat, Acceptable User "
-                                                                                  "Policy (AUP), DNS or Proxy")
+                                  choices=['threat', 'aup', 'dns', 'proxy', 'netcon'],
+                                  help="Event type: Threat, Acceptable User "
+                                       "Policy (AUP), DNS, Proxy or "
+                                       "Network traffic connections details")
         event_parser.add_argument('--start', '-s', type=int, help="Start datetime (EPOCH),\nDefault is 30 min ago")
         event_parser.add_argument('--end', '-e', type=int, help="End datetime (EPOCH),\nDefault is now - 3 min")
         event_parser.add_argument('--output', '-o', help="Output file, default is stdout. Encoding is utf-8.")
