@@ -40,7 +40,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 
 #: Window span in ad-hoc mode, default is 3 min
 span_duration_min = 3
@@ -232,6 +232,8 @@ def input2feed(event_type):
         api_eventtype = "dns-activities"
     elif event_type == "proxy":
         api_eventtype = "proxy-traffic/transactions"
+    elif event_type == "netcon":
+        api_eventtype = "network-traffic/connections"
     if api_eventtype is None:
         raise ValueError(f'event_type provided is support supported: {event_type}')
     return api_eventtype

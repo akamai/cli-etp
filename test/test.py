@@ -130,6 +130,18 @@ class TestEvents(CliETPTest):
             if os.path.isfile(output_filename):
                 os.remove(output_filename)
 
+    def test_event_netcon(self):
+        """
+        Fetch Network Connection Details events
+        """
+        cmd = self.cli_run("event", "netcon", "--start", self.after, "--end", self.before)
+        stdout, stderr = cmd.communicate(timeout=120)
+        events = stdout.decode(encoding)
+        event_count = len(events.splitlines())
+        self.assertGreater(event_count, 0, "We expect at least one Network Connections Details event")
+        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+
+
 
 class TestCliETP(CliETPTest):
 
