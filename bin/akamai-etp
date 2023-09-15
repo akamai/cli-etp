@@ -266,7 +266,7 @@ def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, 
     post_data = {
         'startTimeSec': start,
         'endTimeSec': end,
-        'orderBy': "DESC",
+        'orderBy': "ASC",
         'pageNumber': page_number,
         'pageSize': EVENT_PAGE_SIZE,
         'filters': {}
