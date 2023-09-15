@@ -1,4 +1,4 @@
-# Akamai CLI: Secure Internet Access Enterprise<!-- omit in toc -->
+# Akamai CLI: Secure Internet Access (SIA) Enterprise<!-- omit in toc -->
 
 SIA Enterprise was formerly known as Enterprise Threat Protector (ETP).  
 More information at https://www.akamai.com/sia
@@ -31,7 +31,7 @@ More information at https://www.akamai.com/sia
 Secure Internet Access Enterprise (formerly ETP) comes with a full suite of APIs. 
 API requires to implement code to be able to interact with the service.
 
-That's where Akamai CLI greatly help, no longer script to wrote yourself, you can run very common operations directly from the command line.
+That's where Akamai CLI greatly help, no longer code to wrote yourself, you can run very common operations directly from the command line.
 
 ## Prerequisites
 
@@ -252,8 +252,9 @@ $ akamai etp tenant clients
 
 ## Frequently Asked Questions
 
-<em>Q: Can I use cli-etp to stream data to my SIEM?</em>  
-A: Yes, you can use the file output and have the file monitor by a SIEM agent. Alternatively check out [Akamai Universal Log Streamer (ULS)](https://github.com/akamai/uls) which offer TCP, UDP, HTTP and File output with a lot of flexibility!
+<em>Q: Can I use `cli-etp` to stream data to my SIEM?</em>  
+A: Yes, you can use the file output and have the file monitor by a SIEM agent.  
+Alternatively check out [Akamai Universal Log Streamer (ULS)](https://github.com/akamai/uls) which offer TCP, UDP, HTTP and File output with a lot of flexibility!
 
 <em>Will there be a cli-sia?</em>  
 A: Maybe. We keep maintaining `cli-etp` and the project might be renamed to `cli-sia` at some point.
