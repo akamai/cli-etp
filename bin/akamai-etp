@@ -334,9 +334,12 @@ def events_summary(start, end, config):
         r = session.get(api_url, params=build_params({"startTimeSec": start, "endTimeSec": end}))
         LOG.debug(f"Aggregate report: {r.text} events")
         data = r.json()
-        return data.get("aggregations", [])[0].get("total")
+        total = 0
+        if len(data.get("aggregations", [])) > 0:
+            total = data.get("aggregations", [])[0].get("total")
+        return total
     except Exception:
-        LOG.exception("Error fetching summary...")
+        LOG.exception(f"Error fetching {config.event_type} summary...")
 
 
 def fetch_events_concurrent(config, output):
