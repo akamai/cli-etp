@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 class EdgeGridConfig():
 
     parser = argparse.ArgumentParser(prog="akamai etp",
-                                     description='Interact with ETP configuration and logs/events',
+                                     description='Interact with SIA Enterprise (formerly ETP) '
+                                                 'configurations and logs/security events',
                                      epilog=epilog,
                                      formatter_class=argparse.RawTextHelpFormatter)
 
@@ -58,11 +59,13 @@ class EdgeGridConfig():
                                        """to the input. --start and --end are ignored when used.""")
         event_parser.add_argument('--poll', type=int, default=60,
                                   help="Poll frequency in seconds with --tail mode. Default is 60s")
-        event_parser.add_argument('--limit', type=int, default=3*60,
+        event_parser.add_argument('--limit', type=int, default=os.environ.get('CLIETP_FETCH_LIMIT', 3*60),
                                   help="Stop the most recent fetch to now minus specified seconds, default is 3 min. "
-                                       "Applicable to --tail")
+                                       "Can be set with environment variable CLIETP_FETCH_LIMIT. "
+                                       "Applicable to --tail/-f")
         event_parser.add_argument('--concurrent', type=int, default=os.environ.get('CLIETP_FETCH_CONCURRENT', 1),
-                                  help="Number of concurrent API call")
+                                  help="Number of concurrent API calls, default is 1. "
+                                       "Can be set with environment variable CLIETP_FETCH_CONCURRENT")
 
         # ETP Lists
         list_parser = subparsers.add_parser("list", help="Manage ETP security list",
