@@ -40,7 +40,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.4.3"
+__version__ = "0.4.5"
 
 #: Window span in ad-hoc mode, default is 3 min
 span_duration_min = 3
