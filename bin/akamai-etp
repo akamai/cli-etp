@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023 Akamai Technologies, Inc. All Rights Reserved
+# Copyright 2024 Akamai Technologies, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.4.5"
+__version__ = "0.4.6"
 
 #: Window span in ad-hoc mode, default is 3 min
 span_duration_min = 3
@@ -285,6 +285,7 @@ def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, 
         stats.inc_api_call()
         LOG.info(f"{{OPEN}} API response code is HTTP/{r.status_code}, body {len(r.content):,} "
                  f"bytes, page #{page_number}")
+
         if r.status_code != 200:
             stats.api_calls_fail += 1
             LOG.error(f"API call failed with HTTP/{r.status_code}: {r.content}")
@@ -300,8 +301,12 @@ def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, 
         output.flush()
 
         if page_number == 1:
-            LOG.info("Page info: %s" % response_data.get("pageInfo", {}))
-            total_records = response_data["pageInfo"]["totalRecords"]
+            page_info = response_data.get("pageInfo", {})
+            LOG.info("Page info: %s" % page_info)
+            total_records = page_info.get("totalRecords")
+            if total_records is None:
+                logging.info("API response without pageinfo.")
+                return
             numOfPages = int((total_records / EVENT_PAGE_SIZE) + 1)
             if numOfPages > 1:
                 LOG.info(f"Calculated number of pages: {numOfPages} (based on {total_records:,} total events)")

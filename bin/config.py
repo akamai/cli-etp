@@ -1,6 +1,6 @@
 # Python edgegrid module - CONFIG for ETP CLI module
 """
-Copyright 2022 Akamai Technologies, Inc. All Rights Reserved.
+Copyright 2024 Akamai Technologies, Inc. All Rights Reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 
@@ -58,11 +58,11 @@ class EdgeGridConfig():
                                        """to the input. --start and --end are ignored when used.""")
         event_parser.add_argument('--poll', type=int, default=60,
                                   help="Poll frequency in seconds with --tail mode. Default is 60s")
-        event_parser.add_argument('--limit', type=int, default=3*60,
+        event_parser.add_argument('--limit', type=int, default=os.environ.get("CLIETP_FETCH_LIMIT", 3*60),
                                   help="Stop the most recent fetch to now minus specified seconds, default is 3 min. "
-                                       "Applicable to --tail")
+                                       "Applicable to --tail. Environment variable: CLIETP_FETCH_LIMIT")
         event_parser.add_argument('--concurrent', type=int, default=os.environ.get('CLIETP_FETCH_CONCURRENT', 1),
-                                  help="Number of concurrent API call")
+                                  help="Number of concurrent API calls. Environment variable: CLIETP_FETCH_CONCURRENT")
 
         # ETP Lists
         list_parser = subparsers.add_parser("list", help="Manage ETP security list",
