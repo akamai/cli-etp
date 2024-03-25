@@ -23,7 +23,7 @@ import json.decoder
 import ipaddress
 import time
 import signal
-from threading import Event
+from threading import Event, Lock
 from enum import Enum
 import logging
 from urllib.parse import parse_qs
@@ -31,6 +31,7 @@ import csv
 import math
 from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 from datetime import timedelta
+import io
 
 # 3rd party modules
 
@@ -40,7 +41,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.4.6"
+__version__ = "0.4.7"
 
 #: Window span in ad-hoc mode, default is 3 min
 span_duration_min = 3
@@ -105,10 +106,10 @@ class ETPEventFetchStats(object):
     #: Timedelta spent in network operation (Request/Response) for the poll interval
     poll_elapsed = timedelta()
 
-    def inc_event(self):
-        "Increment the number of event by 1."
-        self.events += 1
-        self.poll_events += 1
+    def inc_event(self, increment: int=1):
+        "Increment the number of event by increment."
+        self.events += increment
+        self.poll_events += increment
 
     def inc_api_call(self):
         self.api_calls += 1
@@ -123,6 +124,44 @@ class ETPEventFetchStats(object):
 
     def inc_poll_elapsed(self, d: timedelta):
         self.poll_elapsed += d
+
+
+class SortedPageOutput(object):
+    """
+    Accumulates security events (individually dict), indexed per page number.
+    This is meant to used by // threads.
+    If some pages are missing, we hold off in flushing this to the output
+    """
+
+    def __init__(self, output: io.TextIOWrapper) -> None:
+        self.eventByPage = dict()
+        self.output = output
+        self.last_flushed_page = 0
+        self.lock = Lock()
+    
+    def append(self, page_number: int, events: list[dict]) -> None:
+        LOG.debug(f"Adding {len(events)} events from page #{page_number}")
+        self.eventByPage[page_number] = events
+        self.flush()
+
+    def flush(self) -> None:
+        """
+        Flush available events from page arrived.
+        If a gap like page 2 and page 4 are arrived, we don't flush anything
+        """
+        LOG.debug(f"flush() called last_flushed_page={self.last_flushed_page} {sorted(self.eventByPage.keys())}...")
+        with self.lock:  # Critical section concurrent thread flushing will have to wait
+            for page_num in sorted(self.eventByPage.keys()):
+                if page_num == self.last_flushed_page + 1:
+                    for event in self.eventByPage[page_num]:
+                        self.output.write("%s\n" % json.dumps(event))
+                    self.output.flush()
+                    self.last_flushed_page = page_num
+                    del self.eventByPage[page_num]
+                    LOG.debug(f"Flushed till page {self.last_flushed_page}")
+                else:
+                    LOG.debug(f"Current page {page_num} too ahead, waiting for page {self.last_flushed_page + 1}")
+                    break
 
 
 def exit_fromresponse(response):
@@ -248,7 +287,7 @@ def exit_gracefully(signum, frame):
     stop_event.set()
 
 
-def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, output):
+def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, output: SortedPageOutput):
     """
     Fetch a single page of result from ETP API
     It runs the API call and write the output
@@ -288,17 +327,20 @@ def fetch_event_page(start, end, page_number, thread_pool, pool_futures, stats, 
 
         if r.status_code != 200:
             stats.api_calls_fail += 1
-            LOG.error(f"API call failed with HTTP/{r.status_code}: {r.content}")
+            LOG.error(f"API call failed with HTTP/{r.status_code}: {r.content}. URL was {r.url}")
+            # Handle more gracefully 401 (auth error) on page 1 and 
+            # abort the cli right away with return code 1
+            if page_number == 1 and r.status_code == 401:
+                exit(4) # 4xx translates into RC 4
 
         stats.inc_poll_elapsed(r.elapsed)
         LOG.info("{OPEN} API call took %.2f seconds, page #%s" % (r.elapsed.total_seconds(), page_number))
         response_data = r.json()
         stats.bytes += len(r.content)
 
-        for e in response_data.get('dataRows', []):
-            output.write("%s\n" % json.dumps(e))
-            stats.inc_event()
-        output.flush()
+        rows = response_data.get('dataRows', [])
+        output.append(page_number, rows)
+        stats.inc_event(len(rows))
 
         if page_number == 1:
             page_info = response_data.get("pageInfo", {})
@@ -347,11 +389,11 @@ def events_summary(start, end, config):
         LOG.exception(f"Error fetching {config.event_type} summary...")
 
 
-def fetch_events_concurrent(config, output):
+def fetch_events_concurrent(config, output: io.TextIOWrapper):
     """
     Fetch ETP security events
     Unlike the old fetch_events (prior to cli-etp 0.4.1) this version is optimized
-    to fetch the pages with concurrency leveraging a pool of thread.
+    to fetch the pages with concurrency leveraging a pool of threads.
     """
     stats = ETPEventFetchStats()
 
@@ -368,6 +410,7 @@ def fetch_events_concurrent(config, output):
         if config.end:
             end = config.end
 
+    output_pages = SortedPageOutput(output)
     pool_futures = []
     concurrent_fetch = ThreadPoolExecutor(
         max_workers=min(config.concurrent, MAX_FETCH_CONCURRENCY),
@@ -378,10 +421,11 @@ def fetch_events_concurrent(config, output):
         expected_event_count = events_summary(start, end, config)
         # 1st page fetch is executed in the main cli thread, optional subsequent
         # ones are executed within the thread pool
-        fetch_event_page(start, end, 1, concurrent_fetch, pool_futures, stats, output)
+        fetch_event_page(start, end, 1, concurrent_fetch, pool_futures, stats, output_pages)
         # Wait until all the API calls fetching pages are processed
         try:
             wait(pool_futures, return_when=ALL_COMPLETED)
+            output_pages.flush()
             if not config.tail:
                 break
             else:
