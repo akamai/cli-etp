@@ -38,6 +38,8 @@ import tempfile
 import os
 import random
 import re
+import json
+
 
 # Global variables
 encoding = 'utf-8'
@@ -58,6 +60,8 @@ class CliETPTest(unittest.TestCase):
         if os.environ.get('EDGERC_SECTION'):
             command.extend(["--section", os.environ['EDGERC_SECTION']])
         command.extend(*args)
+
+        print(f"\nEDGERC_SECTION={os.environ.get('EDGERC_SECTION', 'default')}")
         print("\nCOMMAND: ", " ".join(command))
         return command
 
@@ -83,21 +87,41 @@ class CliETPTest(unittest.TestCase):
         return total_count
 
 
-class TestEvents(CliETPTest):
+class BaseTestEvents(CliETPTest):
 
-    after = int(time.time() - 15 * 60)
+    after = int(time.time() - 30 * 60)
     before = int(time.time())
+
+    @staticmethod
+    def is_sorted(l):
+        return all(a <= b for a, b in zip(l, l[1:]))
+    
+    @staticmethod
+    def is_seq_sorted(events_list):
+        time_seq = []
+        for e in events_list:
+            event = json.loads(e)
+            time_seq.append(event.get('query', {}).get("time"))
+
+        return TestEvents.is_sorted(time_seq)
+
 
     def test_event_threat(self):
         """
         Fetch threat events
         """
         cmd = self.cli_run("event", "threat", "--start", self.after, "--end", self.before)
-        stdout, stderr = cmd.communicate(timeout=60)
+        stdout, stderr = cmd.communicate(timeout=360)
         events = stdout.decode(encoding)
-        event_count = len(events.splitlines())
-        self.assertGreater(event_count, 0, "We expect at least one threat event")
-        self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+        events_list = events.splitlines()
+
+        if cmd.returncode != 0:
+            print(stderr.decode(encoding))
+
+        self.assertEqual(cmd.returncode, 0, f'cli-etp return code must be 0, {cmd.returncode} returned')
+        self.assertGreater(len(events_list), 0, "We expect at least one threat event")
+        self.assertTrue(TestEvents.is_seq_sorted(events_list), "The list of events is not sorted by query.time")
+
 
     def test_event_aup(self):
         """
@@ -106,9 +130,48 @@ class TestEvents(CliETPTest):
         cmd = self.cli_run("event", "aup", "--start", self.after, "--end", self.before)
         stdout, stderr = cmd.communicate(timeout=120)
         events = stdout.decode(encoding)
-        event_count = len(events.splitlines())
-        self.assertGreater(event_count, 0, "We expect at least one AUP event")
+        events_list = events.splitlines()
+        event_count = len(events_list)
         self.assertEqual(cmd.returncode, 0, 'return code must be 0')
+        self.assertGreater(event_count, 0, "We expect at least one AUP event")
+        self.assertTrue(TestEvents.is_seq_sorted(events_list), "The list of events is not sorted by query.time")
+
+    def test_is_seq_sorted(self):
+        """
+        Test built-in function to ensure a sequence of event is sorted.
+        """
+        self.assertTrue(
+            TestEvents.is_seq_sorted(
+            [
+                '{"query": {"time": "1"}}',
+                '{"query": {"time": "2"}}',
+                '{"query": {"time": "3"}}'
+            ]), "Positive Test")
+        self.assertFalse(
+            TestEvents.is_seq_sorted(
+            [
+                '{"query": {"time": "2"}}',
+                '{"query": {"time": "1"}}',
+                '{"query": {"time": "3"}}'
+            ]), "Negative Test")
+
+    def test_event_dns(self):
+        """
+        Fetch DNS events (the most chatty one)
+        """
+        cmd = self.cli_run("event", "dns", "--start", self.after, "--end", self.before)
+        stdout, stderr = cmd.communicate(timeout=360)
+        events = stdout.decode(encoding)
+        events_list = events.splitlines()
+        print(f"Loaded {len(events_list)} security events (DNS).")
+
+        if cmd.returncode != 0:
+            print(stderr.decode(encoding))
+
+        self.assertEqual(cmd.returncode, 0, f'cli-etp return code must be 0, {cmd.returncode} returned')
+        self.assertGreater(len(events_list), 0, "We expect at least one threat event")
+        self.assertTrue(TestEvents.is_seq_sorted(events_list), "The list of events is not sorted by query.time")
+
 
     def test_event_aup_file(self):
         """
@@ -141,6 +204,17 @@ class TestEvents(CliETPTest):
         self.assertGreater(event_count, 0, "We expect at least one Network Connections Details event")
         self.assertEqual(cmd.returncode, 0, 'return code must be 0')
 
+
+class TestEvents(BaseTestEvents):
+    def setUp(self):
+        super().setUp()
+        del os.environ['CLIETP_FETCH_CONCURRENT']
+
+
+class TestEventsMaxThread(BaseTestEvents):
+    def setUp(self):
+        super().setUp()
+        os.environ['CLIETP_FETCH_CONCURRENT'] = "8"
 
 
 class TestCliETP(CliETPTest):
