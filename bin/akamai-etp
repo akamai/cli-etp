@@ -41,7 +41,7 @@ from requests.compat import urljoin
 from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from config import EdgeGridConfig
 
-__version__ = "0.4.7"
+__version__ = "0.4.8"
 
 #: Window span in ad-hoc mode, default is 3 min
 span_duration_min = 3
@@ -410,7 +410,6 @@ def fetch_events_concurrent(config, output: io.TextIOWrapper):
         if config.end:
             end = config.end
 
-    output_pages = SortedPageOutput(output)
     pool_futures = []
     concurrent_fetch = ThreadPoolExecutor(
         max_workers=min(config.concurrent, MAX_FETCH_CONCURRENCY),
@@ -418,6 +417,7 @@ def fetch_events_concurrent(config, output: io.TextIOWrapper):
 
     while not stop_event.is_set():
         timing_s = time.time()
+        output_pages = SortedPageOutput(output)
         expected_event_count = events_summary(start, end, config)
         # 1st page fetch is executed in the main cli thread, optional subsequent
         # ones are executed within the thread pool
